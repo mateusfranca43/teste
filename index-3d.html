@@ -2493,25 +2493,187 @@
         return geometry;
       }
 
+      function createGrassPatches() {
+        const patchCount = 96;
+        const geometry = new THREE.CircleGeometry(0.48, 8);
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 1,
+          metalness: 0,
+          vertexColors: true,
+          side: THREE.DoubleSide
+        });
+        const patches = new THREE.InstancedMesh(geometry, material, patchCount);
+        const dummy = new THREE.Object3D();
+        const colors = [0x73b85a, 0x82c567, 0x69aa50, 0x91cf72];
+
+        // Textura pseudoaleatória determinística: não consome nem altera o RNG da corrida.
+        for (let index = 0; index < patchCount; index += 1) {
+          const xSeed = ((index * 47 + 13) % 101) / 100;
+          const zSeed = ((index * 71 + 29) % 103) / 102;
+          const scaleSeed = ((index * 31 + 7) % 37) / 36;
+          dummy.position.set((xSeed - 0.5) * 45, -0.062, (zSeed - 0.5) * 31.5);
+          dummy.rotation.set(-Math.PI / 2, 0, index * 0.61);
+          dummy.scale.set(0.75 + scaleSeed * 1.15, 0.35 + scaleSeed * 0.55, 1);
+          dummy.updateMatrix();
+          patches.setMatrixAt(index, dummy.matrix);
+          patches.setColorAt(index, new THREE.Color(colors[index % colors.length]));
+        }
+
+        patches.receiveShadow = true;
+        patches.instanceMatrix.needsUpdate = true;
+        if (patches.instanceColor) patches.instanceColor.needsUpdate = true;
+        scene.add(patches);
+      }
+
+      function createGrandstand() {
+        const pose = getPositionAtDistance(80, state.view.trackWidth / 2 + 5.1);
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+
+        const white = new THREE.MeshStandardMaterial({ color: 0xf7f4e8, roughness: 0.78, flatShading: true });
+        const purple = new THREE.MeshStandardMaterial({ color: 0x8f55d9, roughness: 0.72, flatShading: true });
+        const yellow = new THREE.MeshStandardMaterial({ color: 0xffd552, roughness: 0.74, flatShading: true });
+        const dark = new THREE.MeshStandardMaterial({ color: 0x33424e, roughness: 0.86, flatShading: true });
+
+        for (let row = 0; row < 4; row += 1) {
+          const tier = new THREE.Mesh(new THREE.BoxGeometry(3.8 - row * 0.18, 0.2, 0.62), row % 2 ? purple : white);
+          tier.position.set(0, 0.18 + row * 0.23, row * 0.48);
+          group.add(tier);
+        }
+
+        [-1.65, 1.65].forEach((x) => {
+          const support = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.2, 0.14), dark);
+          support.position.set(x, 0.62, 0.78);
+          group.add(support);
+        });
+
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.16, 1.08), yellow);
+        roof.position.set(0, 1.35, 0.82);
+        group.add(roof);
+
+        const fascia = new THREE.Mesh(new THREE.BoxGeometry(3.25, 0.42, 0.13), purple);
+        fascia.position.set(0, 1.03, -0.38);
+        group.add(fascia);
+
+        group.traverse((child) => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        scene.add(group);
+      }
+
+      function createTireBarrier(distance, lateralOffset, accentColor) {
+        const pose = getPositionAtDistance(distance, lateralOffset);
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+
+        const tireMaterials = [
+          new THREE.MeshStandardMaterial({ color: 0x27313a, roughness: 0.95, flatShading: true }),
+          new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.82, flatShading: true }),
+          new THREE.MeshStandardMaterial({ color: 0xf6f2e7, roughness: 0.86, flatShading: true })
+        ];
+        const tireGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.16, 10);
+
+        for (let column = 0; column < 5; column += 1) {
+          for (let layer = 0; layer < 3; layer += 1) {
+            const tire = new THREE.Mesh(tireGeometry, tireMaterials[(column + layer) % tireMaterials.length]);
+            tire.position.set((column - 2) * 0.39, 0.1 + layer * 0.15, (column % 2) * 0.18);
+            tire.castShadow = true;
+            tire.receiveShadow = true;
+            group.add(tire);
+          }
+        }
+        scene.add(group);
+      }
+
+      function createSponsorBoard(distance, lateralOffset, color) {
+        const pose = getPositionAtDistance(distance, lateralOffset);
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+
+        const boardMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.72, flatShading: true });
+        const postMaterial = new THREE.MeshStandardMaterial({ color: 0xf8f5e9, roughness: 0.84, flatShading: true });
+        const board = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.72, 0.18), boardMaterial);
+        board.position.y = 0.72;
+        group.add(board);
+
+        [-0.65, 0.65].forEach((x) => {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.78, 0.11), postMaterial);
+          post.position.set(x, 0.38, 0);
+          group.add(post);
+        });
+
+        group.traverse((child) => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        scene.add(group);
+      }
+
+      function createPond() {
+        const sand = new THREE.Mesh(
+          new THREE.CircleGeometry(2.65, 28),
+          new THREE.MeshStandardMaterial({ color: 0xe7cf91, roughness: 0.92, flatShading: true })
+        );
+        sand.rotation.x = -Math.PI / 2;
+        sand.scale.set(1, 0.62, 1);
+        sand.position.set(12.3, -0.052, -7.7);
+        sand.receiveShadow = true;
+        scene.add(sand);
+
+        const water = new THREE.Mesh(
+          new THREE.CircleGeometry(2.28, 28),
+          new THREE.MeshStandardMaterial({ color: 0x43b9df, roughness: 0.34, metalness: 0.08, flatShading: true })
+        );
+        water.rotation.x = -Math.PI / 2;
+        water.scale.set(1, 0.58, 1);
+        water.position.set(12.3, -0.042, -7.7);
+        water.receiveShadow = true;
+        scene.add(water);
+
+        const rockMaterial = new THREE.MeshStandardMaterial({ color: 0xf0e3bb, roughness: 1, flatShading: true });
+        [[10.1, -7.2], [14.2, -7.1], [11.2, -8.85], [13.35, -8.8]].forEach(([x, z], index) => {
+          const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28 + index * 0.025, 0), rockMaterial);
+          rock.position.set(x, 0.12, z);
+          rock.scale.y = 0.62;
+          rock.castShadow = true;
+          rock.receiveShadow = true;
+          scene.add(rock);
+        });
+      }
+
+      function createEnvironmentProps() {
+        createGrandstand();
+        createTireBarrier(LOGICAL_LAP_LENGTH * 0.25, state.view.trackWidth / 2 + 1.45, 0xe6425f);
+        createTireBarrier(LOGICAL_LAP_LENGTH * 0.72, -state.view.trackWidth / 2 - 1.45, 0xf7d14a);
+        createSponsorBoard(LOGICAL_LAP_LENGTH * 0.12, -state.view.trackWidth / 2 - 1.65, 0x8f55d9);
+        createSponsorBoard(LOGICAL_LAP_LENGTH * 0.43, state.view.trackWidth / 2 + 1.65, 0xffcf42);
+        createSponsorBoard(LOGICAL_LAP_LENGTH * 0.61, -state.view.trackWidth / 2 - 1.65, 0xe6425f);
+        createSponsorBoard(LOGICAL_LAP_LENGTH * 0.86, state.view.trackWidth / 2 + 1.65, 0x8f55d9);
+        createPond();
+      }
+
       function createTrackScene() {
         const ground = new THREE.Mesh(
-          new THREE.PlaneGeometry(42, 30, 1, 1),
-          new THREE.MeshStandardMaterial({ color: 0x0a1117, roughness: 0.98, metalness: 0.01 })
+          new THREE.PlaneGeometry(48, 34, 1, 1),
+          new THREE.MeshStandardMaterial({ color: 0x7dbd5f, roughness: 1, metalness: 0, flatShading: true })
         );
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = -0.08;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        const grid = new THREE.GridHelper(42, 42, 0x263443, 0x17212b);
-        grid.position.y = -0.065;
-        grid.material.transparent = true;
-        grid.material.opacity = 0.12;
-        scene.add(grid);
+        createGrassPatches();
 
         const shoulder = new THREE.Mesh(
-          createRibbonGeometry(state.view.pathSamples, state.view.trackWidth + 0.5, 0.025),
-          new THREE.MeshStandardMaterial({ color: 0x070b10, roughness: 1, metalness: 0, side: THREE.DoubleSide })
+          createRibbonGeometry(state.view.pathSamples, state.view.trackWidth + 1.55, 0.025),
+          new THREE.MeshStandardMaterial({ color: 0xd8bd78, roughness: 1, metalness: 0, flatShading: true, side: THREE.DoubleSide })
         );
         shoulder.receiveShadow = true;
         scene.add(shoulder);
@@ -2541,10 +2703,10 @@
           [-1, 1].forEach((edge) => {
             const pose = getPositionAtDistance(logicalDistance, edge * state.view.trackWidth / 2);
             const curb = new THREE.Mesh(
-              new THREE.BoxGeometry(0.55, 0.13, 0.34),
+              new THREE.BoxGeometry(0.67, 0.16, 0.46),
               curbMaterials[Math.floor(index / 7) % 2]
             );
-            curb.position.set(pose.x, 0.115, pose.z);
+            curb.position.set(pose.x, 0.13, pose.z);
             curb.rotation.y = -pose.angle;
             curb.castShadow = true;
             curb.receiveShadow = true;
@@ -2573,6 +2735,8 @@
             scene.add(tile);
           }
         }
+
+        createEnvironmentProps();
       }
 
       function createLowPolyCar(runner) {
@@ -2670,22 +2834,22 @@
         });
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.08;
+        renderer.toneMappingExposure = 1.22;
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.setClearColor(0x080c11, 1);
+        renderer.setClearColor(0x8fcfe3, 1);
 
         scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x080c11);
-        scene.fog = new THREE.Fog(0x080c11, 44, 72);
+        scene.background = new THREE.Color(0x8fcfe3);
+        scene.fog = new THREE.Fog(0x8fcfe3, 55, 86);
         camera = new THREE.PerspectiveCamera(40, 1, 0.1, 120);
         camera.position.set(0, 26, 26);
         camera.lookAt(0, 0.25, 0);
 
-        scene.add(new THREE.AmbientLight(0x9fb3c8, 0.62));
-        scene.add(new THREE.HemisphereLight(0xdcecff, 0x0c1218, 1.05));
-        const keyLight = new THREE.DirectionalLight(0xffffff, 2.25);
-        keyLight.position.set(-10, 24, 14);
+        scene.add(new THREE.AmbientLight(0xfff4dc, 1.18));
+        scene.add(new THREE.HemisphereLight(0xdff5ff, 0x6fa755, 1.42));
+        const keyLight = new THREE.DirectionalLight(0xfff4d6, 2.65);
+        keyLight.position.set(-12, 26, 12);
         keyLight.castShadow = true;
         keyLight.shadow.mapSize.set(2048, 2048);
         keyLight.shadow.camera.left = -22;
@@ -2697,8 +2861,8 @@
         keyLight.shadow.bias = -0.00035;
         keyLight.shadow.normalBias = 0.025;
         scene.add(keyLight);
-        const rimLight = new THREE.PointLight(0x638dff, 18, 34, 2);
-        rimLight.position.set(12, 8, -9);
+        const rimLight = new THREE.PointLight(0xffd86b, 12, 36, 2);
+        rimLight.position.set(13, 10, -8);
         scene.add(rimLight);
 
         createTrackScene();
