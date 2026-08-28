@@ -171,12 +171,17 @@
     .race-3d-hud {
       position: absolute;
       z-index: 3;
-      top: 10px;
-      right: 10px;
-      left: 10px;
+      top: 0;
+      right: 0;
+      left: 0;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 7px;
+      padding: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, .08);
+      background: rgba(4, 8, 13, .92);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(12px);
       pointer-events: none;
     }
 
@@ -186,7 +191,7 @@
       border: 1px solid rgba(var(--runner-rgb), .34);
       border-left: 3px solid rgb(var(--runner-rgb));
       border-radius: 8px;
-      background: rgba(4, 8, 13, .82);
+      background: rgba(7, 12, 18, .96);
       box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
       backdrop-filter: blur(10px);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -809,10 +814,11 @@
       }
 
       .race-3d-hud {
-        top: 6px;
-        right: 6px;
-        left: 6px;
+        top: 0;
+        right: 0;
+        left: 0;
         gap: 3px;
+        padding: 6px;
       }
 
       .race-3d-card {
@@ -2493,76 +2499,103 @@
         return geometry;
       }
 
-      function createGrassPatches() {
-        const patchCount = 96;
-        const geometry = new THREE.CircleGeometry(0.48, 8);
-        const material = new THREE.MeshStandardMaterial({
-          color: 0xffffff,
-          roughness: 1,
-          metalness: 0,
-          vertexColors: true,
-          side: THREE.DoubleSide
-        });
-        const patches = new THREE.InstancedMesh(geometry, material, patchCount);
-        const dummy = new THREE.Object3D();
-        const colors = [0x73b85a, 0x82c567, 0x69aa50, 0x91cf72];
+      function createTrackBarrierGeometry(samples, offset, bottomY, topY, thickness) {
+        const positions = [];
+        const indices = [];
 
-        // Textura pseudoaleatória determinística: não consome nem altera o RNG da corrida.
-        for (let index = 0; index < patchCount; index += 1) {
-          const xSeed = ((index * 47 + 13) % 101) / 100;
-          const zSeed = ((index * 71 + 29) % 103) / 102;
-          const scaleSeed = ((index * 31 + 7) % 37) / 36;
-          dummy.position.set((xSeed - 0.5) * 45, -0.062, (zSeed - 0.5) * 31.5);
-          dummy.rotation.set(-Math.PI / 2, 0, index * 0.61);
-          dummy.scale.set(0.75 + scaleSeed * 1.15, 0.35 + scaleSeed * 0.55, 1);
-          dummy.updateMatrix();
-          patches.setMatrixAt(index, dummy.matrix);
-          patches.setColorAt(index, new THREE.Color(colors[index % colors.length]));
+        samples.forEach((sample) => {
+          const normalX = -Math.sin(sample.angle);
+          const normalZ = Math.cos(sample.angle);
+          const centerX = sample.x + normalX * offset;
+          const centerZ = sample.z + normalZ * offset;
+          const halfThickness = thickness / 2;
+
+          positions.push(
+            centerX - normalX * halfThickness, bottomY, centerZ - normalZ * halfThickness,
+            centerX + normalX * halfThickness, bottomY, centerZ + normalZ * halfThickness,
+            centerX - normalX * halfThickness, topY, centerZ - normalZ * halfThickness,
+            centerX + normalX * halfThickness, topY, centerZ + normalZ * halfThickness
+          );
+        });
+
+        for (let index = 0; index < samples.length - 1; index += 1) {
+          const base = index * 4;
+          const next = base + 4;
+          indices.push(
+            base, next, base + 2,
+            next, next + 2, base + 2,
+            base + 1, base + 3, next + 1,
+            next + 1, base + 3, next + 3,
+            base + 2, next + 2, base + 3,
+            next + 2, next + 3, base + 3
+          );
         }
 
-        patches.receiveShadow = true;
-        patches.instanceMatrix.needsUpdate = true;
-        if (patches.instanceColor) patches.instanceColor.needsUpdate = true;
-        scene.add(patches);
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return geometry;
       }
 
-      function createGrandstand() {
-        const pose = getPositionAtDistance(80, state.view.trackWidth / 2 + 5.1);
-        const group = new THREE.Group();
-        group.position.set(pose.x, 0, pose.z);
-        group.rotation.y = -pose.angle;
-
-        const white = new THREE.MeshStandardMaterial({ color: 0xf7f4e8, roughness: 0.78, flatShading: true });
-        const purple = new THREE.MeshStandardMaterial({ color: 0x8f55d9, roughness: 0.72, flatShading: true });
-        const yellow = new THREE.MeshStandardMaterial({ color: 0xffd552, roughness: 0.74, flatShading: true });
-        const dark = new THREE.MeshStandardMaterial({ color: 0x33424e, roughness: 0.86, flatShading: true });
-
-        for (let row = 0; row < 4; row += 1) {
-          const tier = new THREE.Mesh(new THREE.BoxGeometry(3.8 - row * 0.18, 0.2, 0.62), row % 2 ? purple : white);
-          tier.position.set(0, 0.18 + row * 0.23, row * 0.48);
-          group.add(tier);
-        }
-
-        [-1.65, 1.65].forEach((x) => {
-          const support = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.2, 0.14), dark);
-          support.position.set(x, 0.62, 0.78);
-          group.add(support);
+      function createTrackBarriers() {
+        const wallMaterial = new THREE.MeshStandardMaterial({
+          color: 0xf4f2e9,
+          roughness: 0.82,
+          metalness: 0.02,
+          flatShading: true,
+          side: THREE.DoubleSide
         });
-
-        const roof = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.16, 1.08), yellow);
-        roof.position.set(0, 1.35, 0.82);
-        group.add(roof);
-
-        const fascia = new THREE.Mesh(new THREE.BoxGeometry(3.25, 0.42, 0.13), purple);
-        fascia.position.set(0, 1.03, -0.38);
-        group.add(fascia);
-
-        group.traverse((child) => {
-          if (!child.isMesh) return;
-          child.castShadow = true;
-          child.receiveShadow = true;
+        const stripeMaterial = new THREE.MeshStandardMaterial({
+          color: 0x1769c2,
+          roughness: 0.7,
+          metalness: 0.03,
+          flatShading: true,
+          side: THREE.DoubleSide
         });
-        scene.add(group);
+        const sponsorMaterials = [
+          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.76, flatShading: true }),
+          new THREE.MeshStandardMaterial({ color: 0xffd44d, roughness: 0.76, flatShading: true })
+        ];
+        const wallOffset = state.view.trackWidth / 2 + 0.35;
+
+        [-1, 1].forEach((edge) => {
+          const offset = edge * wallOffset;
+          const wall = new THREE.Mesh(
+            createTrackBarrierGeometry(state.view.pathSamples, offset, 0.03, 0.82, 0.24),
+            wallMaterial
+          );
+          wall.castShadow = true;
+          wall.receiveShadow = true;
+          scene.add(wall);
+
+          const stripe = new THREE.Mesh(
+            createTrackBarrierGeometry(state.view.pathSamples, offset, 0.34, 0.58, 0.275),
+            stripeMaterial
+          );
+          stripe.castShadow = true;
+          stripe.receiveShadow = true;
+          scene.add(stripe);
+
+          state.view.pathSamples.forEach((sample, index) => {
+            if (index % 28 !== 0) return;
+            const normalX = -Math.sin(sample.angle);
+            const normalZ = Math.cos(sample.angle);
+            const faceOffset = offset + edge * 0.15;
+            const sponsorBlock = new THREE.Mesh(
+              new THREE.BoxGeometry(0.7, 0.12, 0.045),
+              sponsorMaterials[Math.floor(index / 28) % sponsorMaterials.length]
+            );
+            sponsorBlock.position.set(
+              sample.x + normalX * faceOffset,
+              0.46,
+              sample.z + normalZ * faceOffset
+            );
+            sponsorBlock.rotation.y = -sample.angle;
+            sponsorBlock.castShadow = true;
+            scene.add(sponsorBlock);
+          });
+        });
       }
 
       function createTireBarrier(distance, lateralOffset, accentColor) {
@@ -2590,32 +2623,6 @@
         scene.add(group);
       }
 
-      function createSponsorBoard(distance, lateralOffset, color) {
-        const pose = getPositionAtDistance(distance, lateralOffset);
-        const group = new THREE.Group();
-        group.position.set(pose.x, 0, pose.z);
-        group.rotation.y = -pose.angle;
-
-        const boardMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.72, flatShading: true });
-        const postMaterial = new THREE.MeshStandardMaterial({ color: 0xf8f5e9, roughness: 0.84, flatShading: true });
-        const board = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.72, 0.18), boardMaterial);
-        board.position.y = 0.72;
-        group.add(board);
-
-        [-0.65, 0.65].forEach((x) => {
-          const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.78, 0.11), postMaterial);
-          post.position.set(x, 0.38, 0);
-          group.add(post);
-        });
-
-        group.traverse((child) => {
-          if (!child.isMesh) return;
-          child.castShadow = true;
-          child.receiveShadow = true;
-        });
-        scene.add(group);
-      }
-
       function createPond() {
         const sand = new THREE.Mesh(
           new THREE.CircleGeometry(2.65, 28),
@@ -2636,26 +2643,11 @@
         water.position.set(12.3, -0.042, -7.7);
         water.receiveShadow = true;
         scene.add(water);
-
-        const rockMaterial = new THREE.MeshStandardMaterial({ color: 0xf0e3bb, roughness: 1, flatShading: true });
-        [[10.1, -7.2], [14.2, -7.1], [11.2, -8.85], [13.35, -8.8]].forEach(([x, z], index) => {
-          const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28 + index * 0.025, 0), rockMaterial);
-          rock.position.set(x, 0.12, z);
-          rock.scale.y = 0.62;
-          rock.castShadow = true;
-          rock.receiveShadow = true;
-          scene.add(rock);
-        });
       }
 
       function createEnvironmentProps() {
-        createGrandstand();
         createTireBarrier(LOGICAL_LAP_LENGTH * 0.25, state.view.trackWidth / 2 + 1.45, 0xe6425f);
         createTireBarrier(LOGICAL_LAP_LENGTH * 0.72, -state.view.trackWidth / 2 - 1.45, 0xf7d14a);
-        createSponsorBoard(LOGICAL_LAP_LENGTH * 0.12, -state.view.trackWidth / 2 - 1.65, 0x8f55d9);
-        createSponsorBoard(LOGICAL_LAP_LENGTH * 0.43, state.view.trackWidth / 2 + 1.65, 0xffcf42);
-        createSponsorBoard(LOGICAL_LAP_LENGTH * 0.61, -state.view.trackWidth / 2 - 1.65, 0xe6425f);
-        createSponsorBoard(LOGICAL_LAP_LENGTH * 0.86, state.view.trackWidth / 2 + 1.65, 0x8f55d9);
         createPond();
       }
 
@@ -2668,15 +2660,6 @@
         ground.position.y = -0.08;
         ground.receiveShadow = true;
         scene.add(ground);
-
-        createGrassPatches();
-
-        const shoulder = new THREE.Mesh(
-          createRibbonGeometry(state.view.pathSamples, state.view.trackWidth + 1.55, 0.025),
-          new THREE.MeshStandardMaterial({ color: 0xd8bd78, roughness: 1, metalness: 0, flatShading: true, side: THREE.DoubleSide })
-        );
-        shoulder.receiveShadow = true;
-        scene.add(shoulder);
 
         const track = new THREE.Mesh(
           createRibbonGeometry(state.view.pathSamples, state.view.trackWidth, 0.065),
@@ -2691,28 +2674,7 @@
         track.receiveShadow = true;
         scene.add(track);
 
-        const curbMaterials = [
-          new THREE.MeshStandardMaterial({ color: 0xf3f6f8, roughness: 0.8, flatShading: true }),
-          new THREE.MeshStandardMaterial({ color: 0xe13b4e, roughness: 0.8, flatShading: true })
-        ];
-        // Blocos sólidos alternados nas bordas das curvas: largura e volume
-        // continuam visíveis mesmo com a câmera em perspectiva.
-        state.view.pathSamples.forEach((sample, index) => {
-          if (index % 7 !== 0 || sample.cornerSeverity < 0.16) return;
-          const logicalDistance = sample.distance / state.view.trackLength * LOGICAL_LAP_LENGTH;
-          [-1, 1].forEach((edge) => {
-            const pose = getPositionAtDistance(logicalDistance, edge * state.view.trackWidth / 2);
-            const curb = new THREE.Mesh(
-              new THREE.BoxGeometry(0.67, 0.16, 0.46),
-              curbMaterials[Math.floor(index / 7) % 2]
-            );
-            curb.position.set(pose.x, 0.13, pose.z);
-            curb.rotation.y = -pose.angle;
-            curb.castShadow = true;
-            curb.receiveShadow = true;
-            scene.add(curb);
-          });
-        });
+        createTrackBarriers();
 
         const finishPose = getPositionAtDistance(0);
         const checkerSize = state.view.trackWidth / 10;
