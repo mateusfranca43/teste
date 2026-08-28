@@ -1,0 +1,2775 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#06080b">
+  <meta name="description" content="Neon Circuit — um minigame futurista de corrida com apostas entre amigos.">
+  <link rel="canonical" href="https://neon-circuit-m43.mateusfla43.chatgpt.site/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Neon Circuit — Corrida & Apostas">
+  <meta property="og:description" content="Quatro perfis, uma linha de chegada e apostas entre amigos.">
+  <meta property="og:url" content="https://neon-circuit-m43.mateusfla43.chatgpt.site/">
+  <meta property="og:image" content="https://neon-circuit-m43.mateusfla43.chatgpt.site/og.png">
+  <meta property="og:image:width" content="1728">
+  <meta property="og:image:height" content="907">
+  <meta property="og:image:alt" content="Neon Circuit — Corrida & Apostas">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Neon Circuit — Corrida & Apostas">
+  <meta name="twitter:description" content="Quatro perfis, uma linha de chegada e apostas entre amigos.">
+  <meta name="twitter:image" content="https://neon-circuit-m43.mateusfla43.chatgpt.site/og.png">
+  <title>Neon Circuit 3D — Experimento Three.js</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#06080b',
+            panel: '#0d1117',
+            electric: '#2f8cff',
+            mint: '#3ee6a8',
+            neon: '#b45cff',
+            volcanic: '#ff7a1a'
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --blue: #2f8cff;
+      --mint: #3ee6a8;
+      --purple: #b45cff;
+      --orange: #ff7a1a;
+      --panel: rgba(13, 17, 23, 0.82);
+      --line: rgba(255, 255, 255, 0.08);
+      --muted: #8b96a8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 78% 4%, rgba(47, 140, 255, 0.09), transparent 27rem),
+        radial-gradient(circle at 12% 88%, rgba(180, 92, 255, 0.07), transparent 30rem),
+        #06080b;
+      color: #f5f7fa;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      content: '';
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
+      background-size: 48px 48px;
+      -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 86%);
+      mask-image: radial-gradient(ellipse at center, black 20%, transparent 86%);
+    }
+
+    body::after {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      content: '';
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,255,255,0.012), transparent 18%, rgba(0,0,0,0.2));
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button,
+    label,
+    select {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 2px solid #f5f7fa;
+      outline-offset: 3px;
+    }
+
+    ::selection {
+      background: rgba(47, 140, 255, 0.35);
+      color: white;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: linear-gradient(145deg, rgba(17, 22, 30, 0.9), rgba(9, 12, 17, 0.8));
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.24), inset 0 1px rgba(255, 255, 255, 0.025);
+      backdrop-filter: blur(20px);
+    }
+
+    .eyebrow {
+      color: #768196;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--mint);
+      box-shadow: 0 0 0 4px rgba(62, 230, 168, 0.08), 0 0 16px rgba(62, 230, 168, 0.7);
+    }
+
+    .race-shell {
+      position: relative;
+      min-height: 430px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.075);
+      border-radius: 15px;
+      background: #080c11;
+      isolation: isolate;
+    }
+
+    #raceCanvas {
+      display: block;
+      width: 100%;
+      height: clamp(430px, 48vw, 620px);
+    }
+
+    .race-3d-hud {
+      position: absolute;
+      z-index: 3;
+      top: 10px;
+      right: 10px;
+      left: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+      pointer-events: none;
+    }
+
+    .race-3d-card {
+      min-width: 0;
+      padding: 8px 10px;
+      border: 1px solid rgba(var(--runner-rgb), .34);
+      border-left: 3px solid rgb(var(--runner-rgb));
+      border-radius: 8px;
+      background: rgba(4, 8, 13, .82);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(10px);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .race-3d-card__top,
+    .race-3d-card__bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 5px;
+    }
+
+    .race-3d-card__top {
+      color: #f3f6fa;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: .09em;
+    }
+
+    .race-3d-card__top strong {
+      color: rgb(var(--runner-rgb));
+    }
+
+    .race-3d-card__bottom {
+      margin-top: 5px;
+      color: #8d99a8;
+      font-size: 7px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .lap-3d {
+      position: absolute;
+      z-index: 3;
+      right: 50%;
+      bottom: 13%;
+      transform: translateX(50%);
+      pointer-events: none;
+      color: rgba(255, 255, 255, .48);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .lap-3d strong {
+      display: block;
+      margin-top: 3px;
+      color: #f5f7fa;
+      font-size: 18px;
+      letter-spacing: .08em;
+    }
+
+    .race-banner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      z-index: 5;
+      min-width: 210px;
+      padding: 14px 20px;
+      transform: translate(-50%, -50%) scale(0.96);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: rgba(4, 7, 11, 0.82);
+      box-shadow: 0 22px 70px rgba(0,0,0,.45);
+      opacity: 0;
+      text-align: center;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      backdrop-filter: blur(16px);
+    }
+
+    .race-banner.is-visible {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    .race-banner strong {
+      display: block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: clamp(1.65rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .race-banner span {
+      display: block;
+      margin-top: 6px;
+      color: #8994a6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .photo-finish-active .race-shell {
+      border-color: rgba(255, 255, 255, 0.17);
+      box-shadow: inset 0 0 70px rgba(47, 140, 255, 0.055), 0 0 0 1px rgba(255,255,255,.025);
+    }
+
+    .photo-finish-active .race-shell::after {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      content: '';
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.42));
+      animation: breathe 1.8s ease-in-out infinite alternate;
+    }
+
+    @keyframes breathe {
+      from { opacity: 0.45; }
+      to { opacity: 0.9; }
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 8px;
+      color: #8994a6;
+      font-size: 0.7rem;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+    }
+
+    .input-shell {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 11px;
+      background: rgba(3, 6, 10, 0.58);
+      color: #f5f7fa;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    .input-shell:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+      background: rgba(5, 8, 13, 0.76);
+    }
+
+    .input-shell:focus {
+      border-color: rgba(47, 140, 255, 0.72);
+      box-shadow: 0 0 0 3px rgba(47, 140, 255, 0.09);
+    }
+
+    .input-shell:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    select.input-shell {
+      padding: 0 38px 0 13px;
+    }
+
+    input.input-shell {
+      padding: 0 13px;
+    }
+
+    .segment {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      background: rgba(3, 6, 10, 0.48);
+    }
+
+    .segment label {
+      display: grid;
+      min-height: 38px;
+      cursor: pointer;
+      place-items: center;
+      border-radius: 8px;
+      color: #7f8a9d;
+      font-size: 0.7rem;
+      font-weight: 750;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+    }
+
+    .segment label:has(input:checked) {
+      background: rgba(255, 255, 255, 0.075);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      color: white;
+    }
+
+    .runner-choice {
+      position: relative;
+      min-height: 67px;
+      padding: 12px;
+      cursor: pointer;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      background: rgba(3, 6, 10, 0.42);
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .runner-choice:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255, 255, 255, 0.16);
+      background: rgba(8, 12, 18, 0.8);
+    }
+
+    .runner-choice:has(input:checked) {
+      border-color: color-mix(in srgb, var(--choice-color) 72%, white 6%);
+      background: color-mix(in srgb, var(--choice-color) 9%, rgba(3, 6, 10, 0.9));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--choice-color) 24%, transparent), inset 0 -20px 40px color-mix(in srgb, var(--choice-color) 4%, transparent);
+    }
+
+    .runner-choice::before {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 2px;
+      content: '';
+      background: var(--choice-color);
+      opacity: 0.7;
+    }
+
+    .runner-choice input,
+    .segment input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .runner-choice__name {
+      display: block;
+      padding-right: 36px;
+      overflow: hidden;
+      color: #c9d0da;
+      font-size: 0.68rem;
+      font-weight: 750;
+      letter-spacing: 0.07em;
+      text-overflow: ellipsis;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .runner-choice__odds {
+      position: absolute;
+      top: 11px;
+      right: 10px;
+      color: var(--choice-color);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .runner-choice__trait {
+      display: block;
+      margin-top: 7px;
+      color: #687386;
+      font-size: 0.62rem;
+    }
+
+    .primary-button {
+      position: relative;
+      display: inline-flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.17);
+      border-radius: 11px;
+      background: #f4f7fb;
+      color: #090c11;
+      font-size: 0.7rem;
+      font-weight: 850;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+    }
+
+    .primary-button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: white;
+      box-shadow: 0 12px 34px rgba(255, 255, 255, 0.11);
+    }
+
+    .primary-button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .primary-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.36;
+    }
+
+    .secondary-button {
+      display: inline-flex;
+      min-height: 42px;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      background: rgba(255,255,255,.035);
+      color: #bcc5d2;
+      font-size: 0.68rem;
+      font-weight: 750;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+    }
+
+    .secondary-button:hover:not(:disabled) {
+      border-color: rgba(255,255,255,.18);
+      background: rgba(255,255,255,.07);
+      color: white;
+    }
+
+    .secondary-button:disabled {
+      cursor: not-allowed;
+      opacity: .35;
+    }
+
+    .friend-row,
+    .wager-row {
+      display: grid;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(255,255,255,.065);
+      border-radius: 11px;
+      background: rgba(3,6,10,.34);
+    }
+
+    .friend-row {
+      grid-template-columns: 34px minmax(0,1fr) auto;
+      padding: 10px 10px 10px 11px;
+    }
+
+    .friend-mark {
+      display: grid;
+      width: 31px;
+      height: 31px;
+      place-items: center;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 9px;
+      background: rgba(255,255,255,.035);
+      color: #dce2eb;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .68rem;
+      font-weight: 800;
+    }
+
+    .friend-name {
+      overflow: hidden;
+      color: #d6dce5;
+      font-size: .75rem;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .friend-balance {
+      margin-top: 3px;
+      color: #7e899b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .64rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .remove-button {
+      min-height: 32px;
+      padding: 0 9px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: #717c8e;
+      font-size: .58rem;
+      font-weight: 750;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .remove-button:hover:not(:disabled) {
+      border-color: rgba(255, 112, 112, 0.16);
+      background: rgba(255, 112, 112, 0.055);
+      color: #ff8c8c;
+    }
+
+    .remove-button:disabled {
+      cursor: not-allowed;
+      opacity: .28;
+    }
+
+    .wager-row {
+      grid-template-columns: 3px minmax(0,1fr) auto;
+      padding: 10px 10px 10px 0;
+    }
+
+    .wager-accent {
+      align-self: stretch;
+      border-radius: 0 3px 3px 0;
+      background: var(--wager-color);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--wager-color) 55%, transparent);
+    }
+
+    .wager-copy {
+      min-width: 0;
+    }
+
+    .wager-title {
+      overflow: hidden;
+      color: #d2d8e1;
+      font-size: .69rem;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .wager-meta {
+      margin-top: 3px;
+      color: #717c8e;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .6rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .empty-state {
+      padding: 18px 14px;
+      border: 1px dashed rgba(255,255,255,.09);
+      border-radius: 11px;
+      color: #667184;
+      font-size: .68rem;
+      line-height: 1.55;
+      text-align: center;
+    }
+
+    .scroll-area {
+      scrollbar-color: rgba(255,255,255,.12) transparent;
+      scrollbar-width: thin;
+    }
+
+    .toast-region {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 80;
+      display: grid;
+      width: min(360px, calc(100vw - 36px));
+      gap: 9px;
+      pointer-events: none;
+    }
+
+    .toast {
+      padding: 12px 14px;
+      transform: translateY(8px);
+      border: 1px solid rgba(255,255,255,.11);
+      border-radius: 11px;
+      background: rgba(9, 13, 19, .94);
+      box-shadow: 0 18px 50px rgba(0,0,0,.35);
+      color: #dbe1ea;
+      font-size: .72rem;
+      opacity: 0;
+      animation: toast-in 220ms ease forwards;
+      backdrop-filter: blur(18px);
+    }
+
+    .toast[data-tone="error"] {
+      border-color: rgba(255, 112, 112, .23);
+    }
+
+    .toast[data-tone="success"] {
+      border-color: rgba(62, 230, 168, .22);
+    }
+
+    @keyframes toast-in {
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .result-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      display: grid;
+      padding: 20px;
+      overflow-y: auto;
+      place-items: center;
+      background: rgba(2, 4, 7, .76);
+      backdrop-filter: blur(18px);
+    }
+
+    .result-overlay[hidden] {
+      display: none;
+    }
+
+    .result-card {
+      width: min(780px, 100%);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 23px;
+      background: linear-gradient(145deg, rgba(18, 23, 31, .97), rgba(7, 10, 15, .97));
+      box-shadow: 0 40px 120px rgba(0,0,0,.62), 0 0 70px rgba(47,140,255,.06);
+    }
+
+    .winner-line {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--winner-color), transparent);
+      box-shadow: 0 0 24px var(--winner-color);
+    }
+
+    .classification-item {
+      display: grid;
+      grid-template-columns: 28px 8px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 9px;
+      background: rgba(255,255,255,.018);
+    }
+
+    .settlement-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 1.5fr) repeat(3, minmax(74px, .8fr));
+      gap: 12px;
+      align-items: center;
+      min-width: 510px;
+      padding: 10px 12px;
+      border-top: 1px solid rgba(255,255,255,.06);
+      color: #9da7b6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .65rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .settlement-row:first-child {
+      border-top: 0;
+    }
+
+    .settlement-row--head {
+      color: #626e81;
+      font-size: .57rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .phase-locked .betting-control {
+      pointer-events: none;
+      opacity: .42;
+      filter: saturate(.55);
+    }
+
+    @media (max-width: 520px) {
+      #raceCanvas {
+        height: 390px;
+      }
+
+      .race-3d-hud {
+        top: 6px;
+        right: 6px;
+        left: 6px;
+        gap: 3px;
+      }
+
+      .race-3d-card {
+        padding: 6px 5px;
+      }
+
+      .race-3d-card__top {
+        font-size: 6.5px;
+      }
+
+      .race-3d-card__top span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .race-3d-card__bottom {
+        font-size: 5.5px;
+      }
+
+      .race-3d-card__bottom span:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .runner-choice {
+        min-height: 62px;
+        padding: 10px;
+      }
+
+      .result-overlay {
+        align-items: end;
+        padding: 0;
+      }
+
+      .result-card {
+        max-height: 94vh;
+        overflow-y: auto;
+        border-right: 0;
+        border-bottom: 0;
+        border-left: 0;
+        border-radius: 24px 24px 0 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="app" class="mx-auto w-full max-w-[1480px] px-4 pb-14 pt-5 sm:px-6 lg:px-8 lg:pt-7">
+    <header class="mb-5 flex flex-col gap-5 border-b border-white/[0.07] pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <div class="mb-3 flex items-center gap-3">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="eyebrow">Sistema online · sem áudio</span>
+        </div>
+        <h1 class="text-[clamp(1.8rem,5vw,3.6rem)] font-semibold leading-[0.92] tracking-[-0.065em] text-white">
+          NEON <span class="text-slate-500">CIRCUIT</span>
+        </h1>
+        <p class="mt-3 max-w-xl text-xs leading-relaxed text-slate-500 sm:text-sm">
+          Quatro perfis. Uma linha de chegada. Aposte na leitura certa da pista.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+        <div class="rounded-xl border border-white/[0.07] bg-white/[0.025] px-4 py-3">
+          <p class="eyebrow">Rodada</p>
+          <p id="roundNumber" class="metric-value mt-2 text-sm font-bold text-slate-200">#001</p>
+        </div>
+        <div class="rounded-xl border border-white/[0.07] bg-white/[0.025] px-4 py-3">
+          <p class="eyebrow">Volume</p>
+          <p id="totalPool" class="metric-value mt-2 text-sm font-bold text-slate-200">0 fichas</p>
+        </div>
+        <button id="startRaceButton" class="primary-button col-span-2 px-6 sm:ml-2" type="button">
+          Iniciar corrida
+        </button>
+      </div>
+    </header>
+
+    <section id="racePanel" class="panel p-3 sm:p-4" aria-labelledby="raceTitle">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-3 px-1 sm:px-2">
+        <div class="flex items-center gap-3">
+          <p id="raceTitle" class="eyebrow">Pista / Setor 07</p>
+          <span class="h-3 w-px bg-white/10" aria-hidden="true"></span>
+          <p id="raceStateLabel" class="metric-value text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Apostas abertas</p>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-4">
+          <div id="bulletIndicator" class="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5">
+            <span class="h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_12px_white]"></span>
+            <span class="metric-value text-[9px] font-extrabold tracking-[0.14em] text-white">PHOTO FINISH · 0.2×</span>
+          </div>
+          <p class="metric-value text-[10px] font-bold tracking-[0.1em] text-slate-500">
+            T+ <span id="raceClock" class="text-slate-300">00:00.000</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="race-shell">
+        <canvas id="raceCanvas" role="img" aria-label="Experimento 3D com circuito e quatro carros coloridos em duas voltas"></canvas>
+        <div id="race3dHud" class="race-3d-hud" aria-hidden="true">
+          <div class="race-3d-card" data-runner-id="1" style="--runner-rgb: 47, 140, 255">
+            <div class="race-3d-card__top"><span>C1 · CONSERVADOR</span><strong data-role="rank">P–</strong></div>
+            <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
+          </div>
+          <div class="race-3d-card" data-runner-id="2" style="--runner-rgb: 62, 230, 168">
+            <div class="race-3d-card__top"><span>C2 · ZEBRA</span><strong data-role="rank">P–</strong></div>
+            <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
+          </div>
+          <div class="race-3d-card" data-runner-id="3" style="--runner-rgb: 180, 92, 255">
+            <div class="race-3d-card__top"><span>C3 · CAÓTICO</span><strong data-role="rank">P–</strong></div>
+            <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
+          </div>
+          <div class="race-3d-card" data-runner-id="4" style="--runner-rgb: 255, 122, 26">
+            <div class="race-3d-card__top"><span>C4 · EQUILIBRADO</span><strong data-role="rank">P–</strong></div>
+            <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
+          </div>
+        </div>
+        <div class="lap-3d" aria-hidden="true">Volta<strong id="lap3d">1 / 2</strong></div>
+        <div id="raceBanner" class="race-banner" aria-hidden="true">
+          <strong id="raceBannerTitle">03</strong>
+          <span id="raceBannerSubtitle">Sincronizando largada</span>
+        </div>
+      </div>
+      <p id="raceAnnouncement" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+    </section>
+
+    <section class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <article class="panel p-5 xl:col-span-4" aria-labelledby="friendsTitle">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="eyebrow">Participantes</p>
+            <h2 id="friendsTitle" class="mt-2 text-base font-semibold tracking-tight text-slate-100">Painel da galera</h2>
+          </div>
+          <p id="friendCount" class="metric-value rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[10px] text-slate-500">00</p>
+        </div>
+
+        <form id="friendForm" class="betting-control mt-5 grid grid-cols-[minmax(0,1fr)_110px] gap-2" novalidate>
+          <label class="sr-only" for="friendName">Nome do amigo</label>
+          <input id="friendName" class="input-shell" name="friendName" maxlength="30" autocomplete="off" placeholder="Nome do amigo" required>
+          <label class="sr-only" for="friendBalance">Saldo inicial</label>
+          <input id="friendBalance" class="input-shell metric-value" name="friendBalance" type="number" min="0" max="1000000" step="10" value="1000" required>
+          <button class="secondary-button col-span-2" type="submit">Adicionar ao grid</button>
+          <p id="friendError" class="col-span-2 hidden text-[11px] text-red-300" role="alert"></p>
+        </form>
+
+        <div id="friendsList" class="scroll-area mt-4 grid max-h-[286px] gap-2 overflow-y-auto pr-1"></div>
+
+        <button id="clearSessionButton" class="betting-control mt-4 min-h-10 w-full rounded-lg border border-transparent text-[10px] font-bold uppercase tracking-[0.12em] text-slate-600 transition hover:border-red-300/10 hover:bg-red-300/[0.03] hover:text-red-300" type="button">
+          Zerar sessão
+        </button>
+      </article>
+
+      <article class="panel p-5 xl:col-span-5" aria-labelledby="betTitle">
+        <div>
+          <p class="eyebrow">Mercado fixo</p>
+          <h2 id="betTitle" class="mt-2 text-base font-semibold tracking-tight text-slate-100">Fazer aposta</h2>
+        </div>
+
+        <form id="betForm" class="betting-control mt-5" novalidate>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="field-label" for="betFriend">Quem está apostando</label>
+              <select id="betFriend" class="input-shell" required>
+                <option value="">Cadastre um participante</option>
+              </select>
+            </div>
+            <fieldset>
+              <legend class="field-label">Tipo de aposta</legend>
+              <div class="segment">
+                <label>
+                  <input type="radio" name="betType" value="winner" checked>
+                  Vencedor
+                </label>
+                <label>
+                  <input type="radio" name="betType" value="last">
+                  Lanterna
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <fieldset class="mt-4">
+            <legend class="field-label">Escolha o corredor</legend>
+            <div id="runnerChoices" class="grid grid-cols-2 gap-2"></div>
+          </fieldset>
+
+          <div class="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(120px,.7fr)] gap-3">
+            <div>
+              <label class="field-label" for="betAmount">Valor apostado</label>
+              <input id="betAmount" class="input-shell metric-value" type="number" min="1" step="10" placeholder="100" required>
+            </div>
+            <div class="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
+              <p class="eyebrow">Retorno</p>
+              <p id="potentialReturn" class="metric-value mt-2 truncate text-sm font-bold text-white">0 fichas</p>
+            </div>
+          </div>
+
+          <p class="mt-3 text-[10px] leading-relaxed text-slate-600">
+            A odd é fixada no recibo e vale para os dois mercados. O valor sai do saldo ao confirmar.
+          </p>
+          <p id="betError" class="mt-2 hidden text-[11px] text-red-300" role="alert"></p>
+          <button id="placeBetButton" class="primary-button mt-4 w-full" type="submit" disabled>Confirmar aposta</button>
+        </form>
+      </article>
+
+      <article class="panel flex min-h-[410px] flex-col p-5 xl:col-span-3" aria-labelledby="wagersTitle">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="eyebrow">Book aberto</p>
+            <h2 id="wagersTitle" class="mt-2 text-base font-semibold tracking-tight text-slate-100">Bilhetes ativos</h2>
+          </div>
+          <p id="betCount" class="metric-value rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[10px] text-slate-500">00</p>
+        </div>
+
+        <div id="betsList" class="scroll-area mt-5 grid max-h-[286px] gap-2 overflow-y-auto pr-1"></div>
+
+        <div class="mt-auto grid grid-cols-2 gap-2 border-t border-white/[0.07] pt-4">
+          <div>
+            <p class="eyebrow">Em jogo</p>
+            <p id="activeStake" class="metric-value mt-2 text-sm font-bold text-slate-200">0 fichas</p>
+          </div>
+          <div class="text-right">
+            <p class="eyebrow">Exposição</p>
+            <p id="potentialPayout" class="metric-value mt-2 text-sm font-bold text-slate-200">0 fichas</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <footer class="mt-6 flex flex-col gap-2 border-t border-white/[0.06] pt-4 text-[10px] leading-relaxed text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+      <p>RNG isolado das apostas · Física em passo fixo · Nenhum áudio</p>
+      <p class="metric-value uppercase tracking-[0.12em]">Neon Circuit / 3D Lab</p>
+    </footer>
+  </main>
+
+  <div id="resultOverlay" class="result-overlay" hidden>
+    <section id="resultCard" class="result-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" tabindex="-1">
+      <div id="winnerLine" class="winner-line"></div>
+      <div class="p-5 sm:p-7">
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="eyebrow">Resultado oficial</p>
+            <h2 id="resultTitle" class="mt-3 text-[clamp(1.65rem,5vw,2.7rem)] font-semibold leading-none tracking-[-0.05em] text-white">Photo finish</h2>
+            <p id="resultSubtitle" class="mt-3 text-sm text-slate-500"></p>
+          </div>
+          <div class="rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-left sm:text-right">
+            <p class="eyebrow">Tempo total</p>
+            <p id="resultTime" class="metric-value mt-2 text-base font-bold text-white">00:00.000</p>
+            <p id="resultSeed" class="metric-value mt-1 text-[9px] uppercase tracking-[0.1em] text-slate-600"></p>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="eyebrow">Snapshot da chegada</h3>
+              <p id="lastPlaceLabel" class="metric-value text-[9px] font-bold uppercase tracking-[0.1em] text-slate-600"></p>
+            </div>
+            <div id="classificationList" class="mt-3 grid gap-2"></div>
+          </div>
+
+          <div>
+            <h3 class="eyebrow">Balanço da galera</h3>
+            <div class="scroll-area mt-3 overflow-x-auto rounded-xl border border-white/[0.07] bg-black/10">
+              <div id="settlementTable"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-col-reverse gap-2 border-t border-white/[0.07] pt-5 sm:flex-row sm:justify-end">
+          <button id="reviewResultButton" class="secondary-button px-5" type="button">Rever pista</button>
+          <button id="newRaceButton" class="primary-button px-6" type="button">Nova corrida</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'neon-circuit-state-v1';
+      const ACTIVE_RACE_KEY = 'neon-circuit-active-v1';
+      const MAX_FRAME_DELTA = 0.05;
+      const MAX_FRIENDS = 50;
+      const MAX_BETS = 100;
+      const BULLET_THRESHOLD = 0.95;
+      const BULLET_SCALE = 0.2;
+      const TOTAL_LAPS = 2;
+      const LOGICAL_LAP_LENGTH = 1000;
+      const TOTAL_RACE_DISTANCE = LOGICAL_LAP_LENGTH * TOTAL_LAPS;
+      const MAX_DRIFT_OFFSET = 0.38;
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const TAB_ID = (() => {
+        try {
+          const existing = sessionStorage.getItem('neon-circuit-tab-id');
+          if (existing) return existing;
+          const created = makeId('tab');
+          sessionStorage.setItem('neon-circuit-tab-id', created);
+          return created;
+        } catch {
+          return makeId('tab');
+        }
+      })();
+
+      const RUNNERS = [
+        {
+          id: 1,
+          label: 'Conservador',
+          short: 'C1',
+          trait: 'Ritmo constante',
+          color: '#2f8cff',
+          rgb: '47, 140, 255',
+          odds: 1.5,
+          baseSpeed: 110
+        },
+        {
+          id: 2,
+          label: 'Zebra',
+          short: 'C2',
+          trait: 'Sprint improvável',
+          color: '#3ee6a8',
+          rgb: '62, 230, 168',
+          odds: 7.0,
+          baseSpeed: 110
+        },
+        {
+          id: 3,
+          label: 'Caótico',
+          short: 'C3',
+          trait: 'Velocidade instável',
+          color: '#b45cff',
+          rgb: '180, 92, 255',
+          odds: 3.5,
+          baseSpeed: 110
+        },
+        {
+          id: 4,
+          label: 'Equilibrado',
+          short: 'C4',
+          trait: 'Controle adaptativo',
+          color: '#ff7a1a',
+          rgb: '255, 122, 26',
+          odds: 2.5,
+          baseSpeed: 110
+        }
+      ];
+
+      const elements = {
+        app: document.querySelector('#app'),
+        racePanel: document.querySelector('#racePanel'),
+        canvas: document.querySelector('#raceCanvas'),
+        race3dHud: document.querySelector('#race3dHud'),
+        lap3d: document.querySelector('#lap3d'),
+        raceBanner: document.querySelector('#raceBanner'),
+        raceBannerTitle: document.querySelector('#raceBannerTitle'),
+        raceBannerSubtitle: document.querySelector('#raceBannerSubtitle'),
+        raceAnnouncement: document.querySelector('#raceAnnouncement'),
+        raceStateLabel: document.querySelector('#raceStateLabel'),
+        raceClock: document.querySelector('#raceClock'),
+        bulletIndicator: document.querySelector('#bulletIndicator'),
+        roundNumber: document.querySelector('#roundNumber'),
+        totalPool: document.querySelector('#totalPool'),
+        startRaceButton: document.querySelector('#startRaceButton'),
+        friendForm: document.querySelector('#friendForm'),
+        friendName: document.querySelector('#friendName'),
+        friendBalance: document.querySelector('#friendBalance'),
+        friendError: document.querySelector('#friendError'),
+        friendCount: document.querySelector('#friendCount'),
+        friendsList: document.querySelector('#friendsList'),
+        clearSessionButton: document.querySelector('#clearSessionButton'),
+        betForm: document.querySelector('#betForm'),
+        betFriend: document.querySelector('#betFriend'),
+        runnerChoices: document.querySelector('#runnerChoices'),
+        betAmount: document.querySelector('#betAmount'),
+        potentialReturn: document.querySelector('#potentialReturn'),
+        betError: document.querySelector('#betError'),
+        placeBetButton: document.querySelector('#placeBetButton'),
+        betCount: document.querySelector('#betCount'),
+        betsList: document.querySelector('#betsList'),
+        activeStake: document.querySelector('#activeStake'),
+        potentialPayout: document.querySelector('#potentialPayout'),
+        resultOverlay: document.querySelector('#resultOverlay'),
+        resultCard: document.querySelector('#resultCard'),
+        winnerLine: document.querySelector('#winnerLine'),
+        resultTitle: document.querySelector('#resultTitle'),
+        resultSubtitle: document.querySelector('#resultSubtitle'),
+        resultTime: document.querySelector('#resultTime'),
+        resultSeed: document.querySelector('#resultSeed'),
+        lastPlaceLabel: document.querySelector('#lastPlaceLabel'),
+        classificationList: document.querySelector('#classificationList'),
+        settlementTable: document.querySelector('#settlementTable'),
+        reviewResultButton: document.querySelector('#reviewResultButton'),
+        newRaceButton: document.querySelector('#newRaceButton'),
+        toastRegion: document.querySelector('#toastRegion')
+      };
+
+      let renderer;
+      let scene;
+      let camera;
+      const carObjects = new Map();
+
+      const state = {
+        phase: 'betting',
+        friends: [],
+        bets: [],
+        round: 1,
+        lastResult: null,
+        foreignRace: false,
+        dialogReturnFocus: null,
+        race: null,
+        view: { width: 0, height: 0, dpr: 1 },
+        lastFrame: null,
+        lastUiUpdate: 0,
+        animationId: 0
+      };
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function lerp(from, to, amount) {
+        return from + (to - from) * amount;
+      }
+
+      function moneyToCents(value) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? Math.round(parsed * 100) : NaN;
+      }
+
+      function formatChips(cents, compact = false) {
+        const value = cents / 100;
+        const fractionDigits = Number.isInteger(value) ? 0 : 2;
+        const formatted = new Intl.NumberFormat('pt-BR', {
+          maximumFractionDigits: fractionDigits,
+          minimumFractionDigits: fractionDigits
+        }).format(value);
+        return compact ? formatted : `${formatted} fichas`;
+      }
+
+      function formatTime(seconds) {
+        const safeSeconds = Math.max(0, seconds || 0);
+        const minutes = Math.floor(safeSeconds / 60);
+        const wholeSeconds = Math.floor(safeSeconds % 60);
+        const milliseconds = Math.floor((safeSeconds % 1) * 1000);
+        return `${String(minutes).padStart(2, '0')}:${String(wholeSeconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+      }
+
+      function makeId(prefix) {
+        if (crypto.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+        const values = new Uint32Array(2);
+        crypto.getRandomValues(values);
+        return `${prefix}-${values[0].toString(16)}${values[1].toString(16)}`;
+      }
+
+      function makeSeed() {
+        const value = new Uint32Array(1);
+        crypto.getRandomValues(value);
+        return value[0] >>> 0;
+      }
+
+      function hashString(input) {
+        let hash = 2166136261 >>> 0;
+        for (let index = 0; index < input.length; index += 1) {
+          hash ^= input.charCodeAt(index);
+          hash = Math.imul(hash, 16777619);
+        }
+        return hash >>> 0;
+      }
+
+      function mulberry32(seed) {
+        let value = seed >>> 0;
+        return () => {
+          value += 0x6D2B79F5;
+          let mixed = value;
+          mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+          mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+          return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function persistState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            friends: state.friends,
+            bets: state.bets,
+            round: state.round
+          }));
+          return true;
+        } catch (error) {
+          console.warn('Não foi possível salvar a sessão local.', error);
+          return false;
+        }
+      }
+
+      function readRaceMarker() {
+        try {
+          const raw = localStorage.getItem(ACTIVE_RACE_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') return parsed;
+          return { owner: null, heartbeat: 0, raceId: null };
+        } catch {
+          return { owner: null, heartbeat: 0, raceId: null };
+        }
+      }
+
+      function markRaceActive() {
+        try {
+          localStorage.setItem(ACTIVE_RACE_KEY, JSON.stringify({
+            owner: TAB_ID,
+            raceId: state.race?.id || null,
+            heartbeat: Date.now()
+          }));
+          return true;
+        } catch (error) {
+          console.warn('Não foi possível atualizar o marcador da corrida.', error);
+          return false;
+        }
+      }
+
+      function clearRaceMarker(force = false) {
+        try {
+          const marker = readRaceMarker();
+          if (force || !marker || marker.owner === TAB_ID) {
+            localStorage.removeItem(ACTIVE_RACE_KEY);
+          }
+          return true;
+        } catch (error) {
+          console.warn('Não foi possível remover o marcador da corrida.', error);
+          return false;
+        }
+      }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const parsed = raw ? JSON.parse(raw) : {};
+
+          if (Array.isArray(parsed.friends)) {
+            state.friends = parsed.friends.filter((friend) => (
+              typeof friend.id === 'string' &&
+              typeof friend.name === 'string' &&
+              Number.isSafeInteger(friend.balanceCents) &&
+              friend.balanceCents >= 0
+            ));
+          }
+
+          if (Array.isArray(parsed.bets)) {
+            const friendIds = new Set(state.friends.map((friend) => friend.id));
+            state.bets = parsed.bets.filter((bet) => (
+              typeof bet.id === 'string' &&
+              friendIds.has(bet.friendId) &&
+              ['winner', 'last'].includes(bet.type) &&
+              RUNNERS.some((runner) => runner.id === bet.runnerId) &&
+              Number.isSafeInteger(bet.stakeCents) &&
+              bet.stakeCents > 0 &&
+              Number.isFinite(bet.odds)
+            ));
+          }
+
+          if (Number.isSafeInteger(parsed.round) && parsed.round > 0) {
+            state.round = parsed.round;
+          }
+
+          const marker = readRaceMarker();
+          const markerIsOwned = marker?.owner === TAB_ID;
+          const markerIsStale = marker && (!Number.isFinite(marker.heartbeat) || Date.now() - marker.heartbeat > 180000);
+
+          if (marker && (markerIsOwned || markerIsStale)) {
+            state.bets.forEach((bet) => {
+              const friend = state.friends.find((item) => item.id === bet.friendId);
+              if (friend) friend.balanceCents += bet.stakeCents;
+            });
+            state.bets = [];
+            if (persistState()) clearRaceMarker(true);
+            setTimeout(() => showToast('A corrida interrompida foi cancelada e as apostas foram devolvidas.', 'success'), 80);
+          } else if (marker) {
+            state.phase = 'external';
+            state.foreignRace = true;
+            setTimeout(() => showToast('Há uma corrida ativa em outra aba. Este painel ficará bloqueado até o resultado.', 'default'), 80);
+          }
+        } catch (error) {
+          console.warn('Sessão local inválida. Iniciando uma sessão limpa.', error);
+          state.friends = [];
+          state.bets = [];
+        }
+      }
+
+      function showToast(message, tone = 'default') {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.dataset.tone = tone;
+        toast.textContent = message;
+        elements.toastRegion.appendChild(toast);
+        window.setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(6px)';
+          window.setTimeout(() => toast.remove(), 200);
+        }, 3600);
+      }
+
+      function setInlineError(element, message) {
+        element.textContent = message;
+        element.classList.toggle('hidden', !message);
+      }
+
+      function createEmptyState(message) {
+        const element = document.createElement('div');
+        element.className = 'empty-state';
+        element.textContent = message;
+        return element;
+      }
+
+      function buildRunnerChoices() {
+        const fragment = document.createDocumentFragment();
+        RUNNERS.forEach((runner, index) => {
+          const label = document.createElement('label');
+          label.className = 'runner-choice';
+          label.style.setProperty('--choice-color', runner.color);
+
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = 'betRunner';
+          input.value = String(runner.id);
+          input.checked = index === 0;
+          input.addEventListener('change', updateBetPreview);
+
+          const name = document.createElement('span');
+          name.className = 'runner-choice__name';
+          name.textContent = `${runner.short} · ${runner.label}`;
+
+          const odds = document.createElement('span');
+          odds.className = 'runner-choice__odds';
+          odds.textContent = `${runner.odds.toFixed(1)}×`;
+
+          const trait = document.createElement('span');
+          trait.className = 'runner-choice__trait';
+          trait.textContent = runner.trait;
+
+          label.append(input, name, odds, trait);
+          fragment.appendChild(label);
+        });
+        elements.runnerChoices.replaceChildren(fragment);
+      }
+
+      function renderFriends() {
+        elements.friendCount.textContent = String(state.friends.length).padStart(2, '0');
+        elements.friendsList.replaceChildren();
+
+        const previousSelection = elements.betFriend.value;
+        const selectFragment = document.createDocumentFragment();
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = state.friends.length ? 'Selecione um participante' : 'Cadastre um participante';
+        selectFragment.appendChild(placeholder);
+
+        state.friends.forEach((friend) => {
+          const option = document.createElement('option');
+          option.value = friend.id;
+          option.textContent = `${friend.name} · ${formatChips(friend.balanceCents, true)}`;
+          selectFragment.appendChild(option);
+
+          const row = document.createElement('div');
+          row.className = 'friend-row';
+
+          const mark = document.createElement('div');
+          mark.className = 'friend-mark';
+          mark.textContent = friend.name.trim().slice(0, 2).toUpperCase();
+
+          const copy = document.createElement('div');
+          copy.className = 'min-w-0';
+          const name = document.createElement('p');
+          name.className = 'friend-name';
+          name.textContent = friend.name;
+          const balance = document.createElement('p');
+          balance.className = 'friend-balance';
+          const committed = state.bets
+            .filter((bet) => bet.friendId === friend.id)
+            .reduce((total, bet) => total + bet.stakeCents, 0);
+          balance.textContent = committed
+            ? `${formatChips(friend.balanceCents)} · ${formatChips(committed, true)} em jogo`
+            : formatChips(friend.balanceCents);
+          copy.append(name, balance);
+
+          const remove = document.createElement('button');
+          remove.className = 'remove-button';
+          remove.type = 'button';
+          remove.textContent = 'Remover';
+          remove.disabled = state.phase !== 'betting' || committed > 0;
+          remove.title = committed > 0 ? 'Cancele as apostas deste participante primeiro.' : 'Remover participante';
+          remove.addEventListener('click', () => removeFriend(friend.id));
+
+          row.append(mark, copy, remove);
+          elements.friendsList.appendChild(row);
+        });
+
+        if (!state.friends.length) {
+          elements.friendsList.appendChild(createEmptyState('Cadastre a galera e distribua o saldo inicial antes de abrir os bilhetes.'));
+        }
+
+        elements.betFriend.replaceChildren(selectFragment);
+        if (state.friends.some((friend) => friend.id === previousSelection)) {
+          elements.betFriend.value = previousSelection;
+        } else if (state.friends.length === 1) {
+          elements.betFriend.value = state.friends[0].id;
+        }
+        updateBetPreview();
+      }
+
+      function renderBets() {
+        elements.betsList.replaceChildren();
+        elements.betCount.textContent = String(state.bets.length).padStart(2, '0');
+
+        let totalStake = 0;
+        let totalPotential = 0;
+
+        state.bets.forEach((bet) => {
+          const friend = state.friends.find((item) => item.id === bet.friendId);
+          const runner = RUNNERS.find((item) => item.id === bet.runnerId);
+          if (!friend || !runner) return;
+
+          totalStake += bet.stakeCents;
+          totalPotential += Math.round(bet.stakeCents * bet.odds);
+
+          const row = document.createElement('div');
+          row.className = 'wager-row';
+          row.style.setProperty('--wager-color', runner.color);
+
+          const accent = document.createElement('span');
+          accent.className = 'wager-accent';
+
+          const copy = document.createElement('div');
+          copy.className = 'wager-copy';
+          const title = document.createElement('p');
+          title.className = 'wager-title';
+          title.textContent = `${friend.name} · ${bet.type === 'winner' ? 'Vencedor' : 'Lanterna'} C${runner.id}`;
+          const meta = document.createElement('p');
+          meta.className = 'wager-meta';
+          meta.textContent = `${formatChips(bet.stakeCents, true)} × ${bet.odds.toFixed(1)} = ${formatChips(Math.round(bet.stakeCents * bet.odds), true)}`;
+          copy.append(title, meta);
+
+          const cancel = document.createElement('button');
+          cancel.className = 'remove-button';
+          cancel.type = 'button';
+          cancel.textContent = 'Cancelar';
+          cancel.disabled = state.phase !== 'betting';
+          cancel.addEventListener('click', () => cancelBet(bet.id));
+
+          row.append(accent, copy, cancel);
+          elements.betsList.appendChild(row);
+        });
+
+        if (!state.bets.length) {
+          elements.betsList.appendChild(createEmptyState('Nenhum bilhete confirmado. A corrida pode começar mesmo sem apostas.'));
+        }
+
+        elements.activeStake.textContent = formatChips(totalStake);
+        elements.potentialPayout.textContent = formatChips(totalPotential);
+        elements.totalPool.textContent = formatChips(totalStake);
+      }
+
+      function renderDashboard() {
+        elements.roundNumber.textContent = `#${String(state.round).padStart(3, '0')}`;
+        renderFriends();
+        renderBets();
+        updatePhaseUi();
+      }
+
+      function updateBetPreview() {
+        const selectedRunnerInput = elements.betForm.querySelector('input[name="betRunner"]:checked');
+        const runner = selectedRunnerInput ? RUNNERS.find((item) => item.id === Number(selectedRunnerInput.value)) : null;
+        const amountCents = moneyToCents(elements.betAmount.value);
+        const hasValidAmount = Number.isSafeInteger(amountCents) && amountCents > 0;
+        elements.potentialReturn.textContent = runner && hasValidAmount
+          ? formatChips(Math.round(amountCents * runner.odds))
+          : '0 fichas';
+
+        const friend = state.friends.find((item) => item.id === elements.betFriend.value);
+        elements.placeBetButton.disabled = !(
+          state.phase === 'betting' &&
+          friend &&
+          runner &&
+          hasValidAmount &&
+          amountCents <= friend.balanceCents
+        );
+      }
+
+      function addFriend(event) {
+        event.preventDefault();
+        setInlineError(elements.friendError, '');
+
+        const name = elements.friendName.value.trim().replace(/\s+/g, ' ');
+        const balanceCents = moneyToCents(elements.friendBalance.value);
+
+        if (state.friends.length >= MAX_FRIENDS) {
+          setInlineError(elements.friendError, `O painel aceita até ${MAX_FRIENDS} participantes por sessão.`);
+          return;
+        }
+
+        if (!name) {
+          setInlineError(elements.friendError, 'Digite o nome do participante.');
+          elements.friendName.focus();
+          return;
+        }
+
+        if (state.friends.some((friend) => friend.name.localeCompare(name, 'pt-BR', { sensitivity: 'base' }) === 0)) {
+          setInlineError(elements.friendError, 'Esse nome já está no painel.');
+          elements.friendName.focus();
+          return;
+        }
+
+        if (!Number.isSafeInteger(balanceCents) || balanceCents < 0 || balanceCents > 100000000) {
+          setInlineError(elements.friendError, 'Informe um saldo entre 0 e 1.000.000 de fichas.');
+          elements.friendBalance.focus();
+          return;
+        }
+
+        state.friends.push({ id: makeId('friend'), name, balanceCents });
+        elements.friendName.value = '';
+        persistState();
+        renderFriends();
+        showToast(`${name} entrou no grid com ${formatChips(balanceCents)}.`, 'success');
+        elements.friendName.focus();
+      }
+
+      function removeFriend(friendId) {
+        if (state.phase !== 'betting') return;
+        const friend = state.friends.find((item) => item.id === friendId);
+        if (!friend) return;
+        if (state.bets.some((bet) => bet.friendId === friendId)) {
+          showToast('Cancele os bilhetes desse participante antes de removê-lo.', 'error');
+          return;
+        }
+        state.friends = state.friends.filter((item) => item.id !== friendId);
+        persistState();
+        renderFriends();
+        showToast(`${friend.name} foi removido do painel.`);
+      }
+
+      function placeBet(event) {
+        event.preventDefault();
+        setInlineError(elements.betError, '');
+        if (state.phase !== 'betting') return;
+
+        if (state.bets.length >= MAX_BETS) {
+          setInlineError(elements.betError, `O book aceita até ${MAX_BETS} bilhetes por rodada.`);
+          return;
+        }
+
+        const friend = state.friends.find((item) => item.id === elements.betFriend.value);
+        const typeInput = elements.betForm.querySelector('input[name="betType"]:checked');
+        const runnerInput = elements.betForm.querySelector('input[name="betRunner"]:checked');
+        const runner = runnerInput ? RUNNERS.find((item) => item.id === Number(runnerInput.value)) : null;
+        const stakeCents = moneyToCents(elements.betAmount.value);
+
+        if (!friend) {
+          setInlineError(elements.betError, 'Selecione quem está apostando.');
+          elements.betFriend.focus();
+          return;
+        }
+
+        if (!typeInput || !runner) {
+          setInlineError(elements.betError, 'Escolha o mercado e o corredor.');
+          return;
+        }
+
+        if (!Number.isSafeInteger(stakeCents) || stakeCents <= 0) {
+          setInlineError(elements.betError, 'A aposta deve ser maior que zero.');
+          elements.betAmount.focus();
+          return;
+        }
+
+        if (stakeCents > friend.balanceCents) {
+          setInlineError(elements.betError, `${friend.name} tem apenas ${formatChips(friend.balanceCents)} disponíveis.`);
+          elements.betAmount.focus();
+          return;
+        }
+
+        friend.balanceCents -= stakeCents;
+        state.bets.push({
+          id: makeId('bet'),
+          friendId: friend.id,
+          type: typeInput.value,
+          runnerId: runner.id,
+          stakeCents,
+          odds: runner.odds
+        });
+
+        elements.betAmount.value = '';
+        persistState();
+        renderFriends();
+        renderBets();
+        showToast(`Bilhete confirmado: ${friend.name} em C${runner.id} ${runner.label}.`, 'success');
+      }
+
+      function cancelBet(betId) {
+        if (state.phase !== 'betting') return;
+        const bet = state.bets.find((item) => item.id === betId);
+        if (!bet) return;
+        const friend = state.friends.find((item) => item.id === bet.friendId);
+        if (friend) friend.balanceCents += bet.stakeCents;
+        state.bets = state.bets.filter((item) => item.id !== betId);
+        persistState();
+        renderFriends();
+        renderBets();
+        showToast('Bilhete cancelado e valor devolvido.');
+      }
+
+      function clearSession() {
+        if (state.phase !== 'betting') return;
+        const confirmed = window.confirm('Zerar participantes, saldos, apostas e número da rodada?');
+        if (!confirmed) return;
+        state.friends = [];
+        state.bets = [];
+        state.round = 1;
+        state.lastResult = null;
+        if (persistState()) clearRaceMarker(true);
+        renderDashboard();
+        resetRunnersForLobby();
+        showToast('Sessão zerada.');
+      }
+
+      function createRaceRunner(config, seed) {
+        const eventRng = mulberry32(hashString(`${seed}:${config.id}:event`));
+        return {
+          ...config,
+          distance: 0,
+          previousDistance: 0,
+          progress: 0,
+          previousProgress: 0,
+          velocity: 0,
+          acceleration: 0,
+          targetSpeed: config.baseSpeed,
+          speedResponse: 3.8,
+          noise: 0,
+          noiseTimer: 0,
+          sprintTimer: 0,
+          sprintCooldown: config.id === 2 ? 2.5 : 0,
+          sprintSpeed: config.baseSpeed * 0.95 * 1.4,
+          stumbleTimer: 0,
+          stumbleCooldown: 0,
+          balancedTarget: config.baseSpeed,
+          driftOffset: 0,
+          racingLineOffset: 0,
+          previousPathAngle: null,
+          cornerGrip: config.id === 3 ? 0.78 + eventRng() * 0.44 : 1,
+          eventRng,
+          noiseRng: mulberry32(hashString(`${seed}:${config.id}:noise`))
+        };
+      }
+
+      function createRace(seed = makeSeed()) {
+        return {
+          id: makeId('race'),
+          seed,
+          runners: RUNNERS.map((runner) => createRaceRunner(runner, seed)),
+          elapsedReal: 0,
+          elapsedSim: 0,
+          lapLength: LOGICAL_LAP_LENGTH,
+          totalDistance: TOTAL_RACE_DISTANCE,
+          countdownStartedAt: performance.now(),
+          bulletTime: false,
+          bulletTriggeredAt: null,
+          lastHeartbeat: 0,
+          settled: false,
+          frozenBets: state.bets.map((bet) => ({ ...bet })),
+          classification: [],
+          winner: null,
+          last: null,
+          finishPositions: null
+        };
+      }
+
+      function resetRunnersForLobby() {
+        const seed = 1;
+        state.race = createRace(seed);
+        state.race.runners.forEach((runner) => {
+          runner.distance = 0;
+          runner.previousDistance = 0;
+          runner.progress = 0;
+          runner.previousProgress = 0;
+          runner.velocity = 0;
+          runner.acceleration = 0;
+          runner.driftOffset = 0;
+          runner.previousPathAngle = null;
+        });
+        carObjects.forEach((object) => {
+          object.trail.history = [];
+          object.trail.lastDistance = Infinity;
+          object.trail.line.geometry.setDrawRange(0, 0);
+        });
+        state.lastFrame = null;
+        state.lastUiUpdate = 0;
+      }
+
+      function beginRace() {
+        if (state.phase === 'finished') {
+          prepareNewRound();
+          return;
+        }
+        if (state.phase !== 'betting') return;
+
+        setInlineError(elements.betError, '');
+        setInlineError(elements.friendError, '');
+        state.race = createRace();
+        state.phase = 'countdown';
+        state.lastFrame = null;
+        state.lastUiUpdate = 0;
+        markRaceActive();
+        state.race.lastHeartbeat = Date.now();
+        updatePhaseUi();
+        renderFriends();
+        renderBets();
+        announce('Largada em três segundos.');
+      }
+
+      function startLiveRace() {
+        if (state.phase !== 'countdown') return;
+        state.phase = 'racing';
+        state.race.elapsedReal = 0;
+        state.race.elapsedSim = 0;
+        state.lastFrame = performance.now();
+        elements.raceBanner.classList.remove('is-visible');
+        updatePhaseUi();
+        announce('Corrida iniciada.');
+      }
+
+      // O RNG altera apenas a velocidade-alvo. A velocidade real nunca recebe
+      // saltos: ela converge exponencialmente para o alvo na integração abaixo.
+      function updateRunnerIntent(runner, dt) {
+        runner.noiseTimer -= dt;
+        runner.sprintCooldown = Math.max(0, runner.sprintCooldown - dt);
+
+        let target = runner.baseSpeed;
+        let response = 3.8;
+
+        if (runner.id === 1) {
+          // Conservador: referência pura, sem ruído ou eventos aleatórios.
+          target = runner.baseSpeed;
+          response = 3.2;
+        }
+
+        if (runner.id === 2) {
+          const slowBase = runner.baseSpeed * 0.95;
+          if (runner.sprintTimer > 0) {
+            runner.sprintTimer = Math.max(0, runner.sprintTimer - dt);
+            target = runner.sprintSpeed;
+            response = 3.1;
+            if (runner.sprintTimer === 0) runner.sprintCooldown = 5 + runner.eventRng() * 2;
+          } else {
+            // 0,1% por frame a 60 fps convertido em taxa por segundo.
+            const sprintChance = 1 - Math.exp(-0.06003 * dt);
+            if (runner.sprintCooldown <= 0 && runner.eventRng() < sprintChance) {
+              runner.sprintTimer = 1.5;
+              runner.sprintSpeed = slowBase * 1.4;
+              target = runner.sprintSpeed;
+              response = 3.1;
+            } else {
+              target = slowBase;
+              response = 2.8;
+            }
+          }
+        }
+
+        if (runner.id === 3) {
+          // Caótico: +10% em retas, mas perde até 52% em curvas fechadas.
+          const pose = state.view.trackLength ? getPositionAtDistance(runner.distance) : { cornerSeverity: 0 };
+          const severity = pose.cornerSeverity || 0;
+          const tightness = clamp((severity - 0.52) / 0.48, 0, 1);
+          target = runner.baseSpeed * (1.1 - tightness * (0.33 / runner.cornerGrip));
+          response = tightness > 0.3 ? 4.8 : 3.5;
+        }
+
+        if (runner.id === 4) {
+          if (runner.noiseTimer <= 0) {
+            runner.balancedTarget = runner.baseSpeed * (0.95 + runner.noiseRng() * 0.1);
+            runner.noiseTimer += 0.65 + runner.noiseRng() * 0.3;
+          }
+          target = clamp(runner.balancedTarget, runner.baseSpeed * 0.95, runner.baseSpeed * 1.05);
+          response = 2.6;
+        }
+
+        runner.targetSpeed = Math.max(0, target);
+        runner.speedResponse = response;
+      }
+
+      function predictRunnerDistance(runner, dt) {
+        const response = Math.max(0.001, runner.speedResponse);
+        const decay = Math.exp(-response * dt);
+        return runner.targetSpeed * dt + (runner.velocity - runner.targetSpeed) * (1 - decay) / response;
+      }
+
+      function normalizeAngle(angle) {
+        return Math.atan2(Math.sin(angle), Math.cos(angle));
+      }
+
+      // Integração analítica de uma velocidade suavizada por lerp exponencial.
+      // dt é tempo real (ou dt * 0.2 no photo finish), em segundos.
+      function integrateRunner(runner, dt) {
+        if (dt <= 0) return;
+        const previousVelocity = runner.velocity;
+        const distanceDelta = predictRunnerDistance(runner, dt);
+        const blend = 1 - Math.exp(-runner.speedResponse * dt);
+        runner.velocity += (runner.targetSpeed - runner.velocity) * blend;
+        runner.acceleration = (runner.velocity - previousVelocity) / dt;
+        runner.distance += Math.max(0, distanceDelta);
+        runner.progress = runner.distance / TOTAL_RACE_DISTANCE;
+
+        // Drift: a variação angular da tangente gera inércia para fora da curva.
+        // O offset é apenas visual; a distância lógica permanece sobre o path.
+        if (state.view.trackLength) {
+          const pose = getPositionAtDistance(runner.distance);
+          if (runner.previousPathAngle !== null) {
+            const angularDelta = normalizeAngle(pose.angle - runner.previousPathAngle);
+            const turnRate = angularDelta / dt;
+            const driftStrength = 0.0016 * (1 + pose.cornerSeverity * 1.65);
+            const desiredDrift = clamp(-turnRate * runner.velocity * driftStrength, -MAX_DRIFT_OFFSET, MAX_DRIFT_OFFSET);
+            const driftBlend = 1 - Math.exp(-5.2 * dt);
+            runner.driftOffset += (desiredDrift - runner.driftOffset) * driftBlend;
+          }
+          runner.previousPathAngle = pose.angle;
+        }
+      }
+
+      function findThresholdCrossingTime(runner, thresholdDistance, maxDt) {
+        if (runner.distance >= thresholdDistance) return 0;
+        if (runner.distance + predictRunnerDistance(runner, maxDt) < thresholdDistance) return Infinity;
+        let low = 0;
+        let high = maxDt;
+        for (let iteration = 0; iteration < 12; iteration += 1) {
+          const middle = (low + high) / 2;
+          if (runner.distance + predictRunnerDistance(runner, middle) >= thresholdDistance) high = middle;
+          else low = middle;
+        }
+        return high;
+      }
+
+      // Um único passo usa o deltaTime real entregue pelo requestAnimationFrame.
+      // Não existe acumulador, incremento fixo ou avanço discreto por waypoint.
+      function updateRace(realDt) {
+        if (state.phase !== 'racing') return;
+
+        const race = state.race;
+        race.elapsedReal += realDt;
+        race.runners.forEach((runner) => {
+          runner.previousDistance = runner.distance;
+          runner.previousProgress = runner.progress;
+        });
+
+        if (race.bulletTime) {
+          const simulationDt = realDt * BULLET_SCALE;
+          race.runners.forEach((runner) => updateRunnerIntent(runner, simulationDt));
+          race.runners.forEach((runner) => integrateRunner(runner, simulationDt));
+          race.elapsedSim += simulationDt;
+        } else {
+          race.runners.forEach((runner) => updateRunnerIntent(runner, realDt));
+          const thresholdDistance = TOTAL_RACE_DISTANCE * BULLET_THRESHOLD;
+          const crossingTime = Math.min(...race.runners.map((runner) => (
+            findThresholdCrossingTime(runner, thresholdDistance, realDt)
+          )));
+
+          if (Number.isFinite(crossingTime)) {
+            race.runners.forEach((runner) => integrateRunner(runner, crossingTime));
+            activateBulletTime();
+            const slowDt = (realDt - crossingTime) * BULLET_SCALE;
+            race.runners.forEach((runner) => integrateRunner(runner, slowDt));
+            race.elapsedSim += crossingTime + slowDt;
+          } else {
+            race.runners.forEach((runner) => integrateRunner(runner, realDt));
+            race.elapsedSim += realDt;
+          }
+        }
+
+        const finishers = race.runners
+          .map((runner, index) => {
+            if (runner.previousDistance < TOTAL_RACE_DISTANCE && runner.distance >= TOTAL_RACE_DISTANCE) {
+              const travelled = runner.distance - runner.previousDistance;
+              return { runner, index, alpha: travelled > 0 ? (TOTAL_RACE_DISTANCE - runner.previousDistance) / travelled : 1 };
+            }
+            return null;
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.alpha - b.alpha || b.runner.velocity - a.runner.velocity || a.runner.id - b.runner.id);
+
+        if (finishers.length) {
+          const finishAlpha = finishers[0].alpha;
+          race.runners.forEach((runner) => {
+            runner.distance = runner.previousDistance + (runner.distance - runner.previousDistance) * finishAlpha;
+            runner.progress = runner.distance / TOTAL_RACE_DISTANCE;
+          });
+          race.elapsedReal = Math.max(0, race.elapsedReal - realDt * (1 - finishAlpha));
+          finishRace(finishers[0].runner.id);
+        }
+      }
+
+      function activateBulletTime() {
+        if (state.race.bulletTime) return;
+        state.race.bulletTime = true;
+        state.race.bulletTriggeredAt = state.race.elapsedReal;
+        elements.racePanel.classList.add('photo-finish-active');
+        elements.bulletIndicator.classList.remove('hidden');
+        elements.bulletIndicator.classList.add('flex');
+        elements.raceStateLabel.textContent = 'Câmera lenta';
+        showRaceBanner('0.2×', 'Photo finish', 1100);
+        announce('Photo finish. Todos os corredores estão em câmera lenta a vinte por cento da velocidade.');
+      }
+
+      function finishRace(winnerId) {
+        if (state.phase !== 'racing' || state.race.settled) return;
+        const race = state.race;
+        const winner = race.runners.find((runner) => runner.id === winnerId);
+        const classification = [...race.runners].sort((a, b) => (
+          b.progress - a.progress ||
+          b.velocity - a.velocity ||
+          a.id - b.id
+        ));
+
+        if (classification[0].id !== winnerId) {
+          const winnerIndex = classification.findIndex((runner) => runner.id === winnerId);
+          classification.splice(winnerIndex, 1);
+          classification.unshift(winner);
+        }
+
+        race.settled = true;
+        race.winner = winner;
+        race.classification = classification;
+        race.last = classification[classification.length - 1];
+        race.finishPositions = race.runners.map((runner) => runner.progress);
+        state.phase = 'finished';
+        const settlement = settleBets(race);
+        state.lastResult = {
+          seed: race.seed,
+          time: race.elapsedReal,
+          winnerId: race.winner.id,
+          lastId: race.last.id,
+          classification: race.classification.map((runner) => ({ id: runner.id, progress: runner.progress })),
+          settlement
+        };
+
+        state.bets = [];
+
+        if (persistState()) clearRaceMarker();
+        updatePhaseUi();
+        renderFriends();
+        renderBets();
+        showRaceBanner(`C${race.winner.id}`, `${race.winner.label} venceu`, 900);
+        announce(`Fim de corrida. Corredor ${race.winner.id}, ${race.winner.label}, venceu. Corredor ${race.last.id}, ${race.last.label}, era a lanterna no instante da chegada.`);
+
+        window.setTimeout(() => openResultOverlay(state.lastResult), 760);
+      }
+
+      function settleBets(race) {
+        const rows = new Map();
+        race.frozenBets.forEach((bet) => {
+          const friend = state.friends.find((item) => item.id === bet.friendId);
+          if (!friend) return;
+
+          if (!rows.has(friend.id)) {
+            rows.set(friend.id, {
+              friendId: friend.id,
+              name: friend.name,
+              stakeCents: 0,
+              payoutCents: 0,
+              netCents: 0,
+              finalBalanceCents: friend.balanceCents,
+              wins: 0,
+              bets: 0
+            });
+          }
+
+          const row = rows.get(friend.id);
+          const hit = (bet.type === 'winner' && bet.runnerId === race.winner.id) ||
+            (bet.type === 'last' && bet.runnerId === race.last.id);
+          const payoutCents = hit ? Math.round(bet.stakeCents * bet.odds) : 0;
+          if (hit) {
+            friend.balanceCents += payoutCents;
+            row.wins += 1;
+          }
+          row.bets += 1;
+          row.stakeCents += bet.stakeCents;
+          row.payoutCents += payoutCents;
+          row.netCents += payoutCents - bet.stakeCents;
+          row.finalBalanceCents = friend.balanceCents;
+        });
+        return [...rows.values()];
+      }
+
+      function prepareNewRound() {
+        if (state.phase !== 'finished') return;
+        closeResultOverlay(false);
+        state.round += 1;
+        state.bets = [];
+        state.phase = 'betting';
+        state.lastResult = null;
+        elements.racePanel.classList.remove('photo-finish-active');
+        elements.bulletIndicator.classList.add('hidden');
+        elements.bulletIndicator.classList.remove('flex');
+        resetRunnersForLobby();
+        persistState();
+        renderDashboard();
+        announce('Nova rodada. Apostas abertas.');
+        window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+        window.setTimeout(() => elements.startRaceButton.focus(), 20);
+      }
+
+      function closeResultOverlay(returnFocus = true) {
+        if (elements.resultOverlay.hidden) return;
+        elements.resultOverlay.hidden = true;
+        elements.app.inert = false;
+        elements.app.removeAttribute('aria-hidden');
+        document.body.style.overflow = '';
+        if (returnFocus) {
+          const target = state.dialogReturnFocus instanceof HTMLElement && state.dialogReturnFocus.isConnected
+            ? state.dialogReturnFocus
+            : elements.startRaceButton;
+          window.setTimeout(() => target.focus(), 10);
+        }
+      }
+
+      function openResultOverlay(result) {
+        if (!result) return;
+        const winner = RUNNERS.find((runner) => runner.id === result.winnerId);
+        const last = RUNNERS.find((runner) => runner.id === result.lastId);
+        elements.winnerLine.style.setProperty('--winner-color', winner.color);
+        elements.resultTitle.textContent = `C${winner.id} · ${winner.label}`;
+        elements.resultTitle.style.color = winner.color;
+        elements.resultSubtitle.textContent = `Vencedor oficial · C${last.id} ${last.label} era a lanterna no instante da chegada.`;
+        elements.resultTime.textContent = formatTime(result.time);
+        elements.resultSeed.textContent = `Seed ${result.seed.toString(16).toUpperCase().padStart(8, '0')}`;
+        elements.lastPlaceLabel.textContent = `Lanterna C${last.id}`;
+
+        elements.classificationList.replaceChildren();
+        result.classification.forEach((entry, index) => {
+          const runner = RUNNERS.find((item) => item.id === entry.id);
+          const item = document.createElement('div');
+          item.className = 'classification-item';
+
+          const rank = document.createElement('span');
+          rank.className = 'metric-value text-[10px] font-extrabold text-slate-500';
+          rank.textContent = String(index + 1).padStart(2, '0');
+          const color = document.createElement('span');
+          color.className = 'h-2 w-2 rounded-full';
+          color.style.background = runner.color;
+          color.style.boxShadow = `0 0 12px ${runner.color}`;
+          const name = document.createElement('span');
+          name.className = 'truncate text-[11px] font-bold uppercase tracking-[0.07em] text-slate-300';
+          name.textContent = `C${runner.id} · ${runner.label}`;
+          const progress = document.createElement('span');
+          progress.className = 'metric-value text-[10px] text-slate-600';
+          progress.textContent = `${Math.min(entry.progress * 100, 100).toFixed(1)}%`;
+          item.append(rank, color, name, progress);
+          elements.classificationList.appendChild(item);
+        });
+
+        elements.settlementTable.replaceChildren();
+        const header = document.createElement('div');
+        header.className = 'settlement-row settlement-row--head';
+        ['Participante', 'Apostado', 'Variação', 'Novo saldo'].forEach((label) => {
+          const cell = document.createElement('span');
+          cell.textContent = label;
+          header.appendChild(cell);
+        });
+        elements.settlementTable.appendChild(header);
+
+        if (!result.settlement.length) {
+          const empty = document.createElement('div');
+          empty.className = 'min-w-[510px] px-4 py-6 text-center text-[11px] text-slate-600';
+          empty.textContent = 'Corrida concluída sem bilhetes ativos.';
+          elements.settlementTable.appendChild(empty);
+        } else {
+          result.settlement.forEach((row) => {
+            const line = document.createElement('div');
+            line.className = 'settlement-row';
+
+            const name = document.createElement('span');
+            name.className = 'truncate font-bold text-slate-300';
+            name.textContent = row.name;
+            const stake = document.createElement('span');
+            stake.textContent = formatChips(row.stakeCents, true);
+            const net = document.createElement('span');
+            net.textContent = `${row.netCents > 0 ? '+' : ''}${formatChips(row.netCents, true)}`;
+            net.style.color = row.netCents > 0 ? '#3ee6a8' : row.netCents < 0 ? '#ff8c8c' : '#9da7b6';
+            const balance = document.createElement('span');
+            balance.className = 'font-bold text-white';
+            balance.textContent = formatChips(row.finalBalanceCents, true);
+            line.append(name, stake, net, balance);
+            elements.settlementTable.appendChild(line);
+          });
+        }
+
+        state.dialogReturnFocus = document.activeElement;
+        elements.resultOverlay.hidden = false;
+        elements.app.inert = true;
+        elements.app.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = 'hidden';
+        window.setTimeout(() => elements.resultCard.focus(), 20);
+      }
+
+      function showRaceBanner(title, subtitle, duration = 0) {
+        elements.raceBannerTitle.textContent = title;
+        elements.raceBannerSubtitle.textContent = subtitle;
+        elements.raceBanner.classList.add('is-visible');
+        if (duration > 0) {
+          window.setTimeout(() => {
+            if (state.phase !== 'countdown') elements.raceBanner.classList.remove('is-visible');
+          }, duration);
+        }
+      }
+
+      function announce(message) {
+        elements.raceAnnouncement.textContent = '';
+        window.setTimeout(() => { elements.raceAnnouncement.textContent = message; }, 20);
+      }
+
+      function updatePhaseUi() {
+        const locked = state.phase !== 'betting';
+        elements.app.classList.toggle('phase-locked', locked);
+
+        if (state.phase === 'betting') {
+          elements.raceStateLabel.textContent = 'Apostas abertas';
+          elements.startRaceButton.textContent = 'Iniciar corrida';
+          elements.startRaceButton.disabled = false;
+          elements.raceClock.textContent = '00:00.000';
+        }
+
+        if (state.phase === 'countdown') {
+          elements.raceStateLabel.textContent = 'Largada armada';
+          elements.startRaceButton.textContent = 'Preparando';
+          elements.startRaceButton.disabled = true;
+        }
+
+        if (state.phase === 'racing') {
+          elements.raceStateLabel.textContent = state.race.bulletTime ? 'Câmera lenta' : 'Corrida ao vivo';
+          elements.startRaceButton.textContent = 'Corrida ao vivo';
+          elements.startRaceButton.disabled = true;
+        }
+
+        if (state.phase === 'finished') {
+          elements.raceStateLabel.textContent = 'Resultado oficial';
+          elements.startRaceButton.textContent = 'Nova corrida';
+          elements.startRaceButton.disabled = false;
+        }
+
+        if (state.phase === 'external') {
+          elements.raceStateLabel.textContent = 'Corrida em outra aba';
+          elements.startRaceButton.textContent = 'Aguardando resultado';
+          elements.startRaceButton.disabled = true;
+        }
+
+        elements.friendForm.querySelectorAll('input, button').forEach((control) => { control.disabled = locked; });
+        elements.betForm.querySelectorAll('input, select').forEach((control) => { control.disabled = locked; });
+        elements.clearSessionButton.disabled = locked;
+        if (locked) elements.placeBetButton.disabled = true;
+        if (!locked) updateBetPreview();
+      }
+
+      function getRanks() {
+        if (!state.race) return new Map();
+        const sorted = [...state.race.runners].sort((a, b) => b.progress - a.progress || b.velocity - a.velocity || a.id - b.id);
+        return new Map(sorted.map((runner, index) => [runner.id, index + 1]));
+      }
+
+      function getRunnerStatus(runner, rank) {
+        if (state.phase === 'betting') return 'Pronto';
+        if (state.phase === 'countdown') return 'Sincronizando';
+        if (state.phase === 'finished') return rank === 1 ? 'Vencedor' : rank === 4 ? 'Lanterna' : 'Classificado';
+        if (runner.stumbleTimer > 0) return 'Tropeçou';
+        if (runner.sprintTimer > 0) return 'Sprint!';
+        if (rank === 1 && runner.progress > 0.015) return 'Liderando';
+        if (runner.acceleration > 7) return 'Acelerando';
+        if (runner.acceleration < -7) return 'Freando';
+        return 'Estável';
+      }
+
+      function resizeCanvas() {
+        const rect = elements.canvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.max(320, rect.width);
+        const height = Math.max(380, rect.height);
+        const circuit = buildCircuitGeometry();
+        state.view = {
+          width,
+          height,
+          dpr,
+          centerY: height / 2,
+          trackLength: circuit.trackLength,
+          trackWidth: 2.75,
+          laneSpacing: 0.48,
+          pathSamples: circuit.samples,
+          apexes: circuit.apexes
+        };
+
+        if (!renderer) initThreeScene();
+        if (!renderer || !camera) return;
+
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(width, height, false);
+        const aspect = width / height;
+        const verticalSize = aspect < 1.15 ? 34 : 23;
+        camera.left = -verticalSize * aspect / 2;
+        camera.right = verticalSize * aspect / 2;
+        camera.top = verticalSize / 2;
+        camera.bottom = -verticalSize / 2;
+        camera.updateProjectionMatrix();
+        drawRace();
+      }
+
+      // O mesmo desenho lógico da V3, agora amostrado no plano X/Z do Three.js.
+      const CIRCUIT_SEGMENTS = [
+        { from: [.12, .86], c1: [.32, .86], c2: [.60, .86], to: [.78, .86] },
+        { c1: [.96, .86], c2: [.97, .58], to: [.74, .58] },
+        { c1: [.64, .58], c2: [.57, .54], to: [.50, .52] },
+        { c1: [.44, .48], c2: [.41, .36], to: [.33, .42] },
+        { c1: [.25, .47], c2: [.27, .26], to: [.18, .31] },
+        { c1: [.14, .15], c2: [.39, .10], to: [.50, .17] },
+        { c1: [.60, .24], c2: [.59, .34], to: [.68, .28] },
+        { c1: [.77, .22], c2: [.88, .26], to: [.84, .39] },
+        { c1: [.88, .50], c2: [.75, .57], to: [.64, .57] },
+        { c1: [.55, .57], c2: [.47, .61], to: [.40, .64] },
+        { c1: [.18, .61], c2: [.02, .82], to: [.12, .86] }
+      ];
+
+      function cubicPoint(p0, p1, p2, p3, t) {
+        const inverse = 1 - t;
+        const inverse2 = inverse * inverse;
+        const t2 = t * t;
+        return {
+          x: inverse2 * inverse * p0.x + 3 * inverse2 * t * p1.x + 3 * inverse * t2 * p2.x + t2 * t * p3.x,
+          z: inverse2 * inverse * p0.z + 3 * inverse2 * t * p1.z + 3 * inverse * t2 * p2.z + t2 * t * p3.z
+        };
+      }
+
+      function cubicTangent(p0, p1, p2, p3, t) {
+        const inverse = 1 - t;
+        return {
+          x: 3 * inverse * inverse * (p1.x - p0.x) + 6 * inverse * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x),
+          z: 3 * inverse * inverse * (p1.z - p0.z) + 6 * inverse * t * (p2.z - p1.z) + 3 * t * t * (p3.z - p2.z)
+        };
+      }
+
+      function buildCircuitGeometry() {
+        const mapPoint = ([x, z]) => ({ x: (x - 0.5) * 30, z: (z - 0.5) * 19 });
+        const segments = [];
+        let current = mapPoint(CIRCUIT_SEGMENTS[0].from);
+        CIRCUIT_SEGMENTS.forEach((segment) => {
+          const c1 = mapPoint(segment.c1);
+          const c2 = mapPoint(segment.c2);
+          const to = mapPoint(segment.to);
+          segments.push({ from: current, c1, c2, to });
+          current = to;
+        });
+
+        const samples = [];
+        let trackLength = 0;
+        let previous = null;
+        segments.forEach((segment, segmentIndex) => {
+          for (let step = segmentIndex === 0 ? 0 : 1; step <= 40; step += 1) {
+            const t = step / 40;
+            const point = cubicPoint(segment.from, segment.c1, segment.c2, segment.to, t);
+            const tangent = cubicTangent(segment.from, segment.c1, segment.c2, segment.to, t);
+            if (previous) trackLength += Math.hypot(point.x - previous.x, point.z - previous.z);
+            const sample = {
+              ...point,
+              angle: Math.atan2(tangent.z, tangent.x),
+              distance: trackLength,
+              segmentIndex,
+              cornerSeverity: 0,
+              turnSign: 0
+            };
+            samples.push(sample);
+            previous = sample;
+          }
+        });
+
+        samples.forEach((sample, index) => {
+          const before = samples[Math.max(0, index - 3)];
+          const after = samples[Math.min(samples.length - 1, index + 3)];
+          const angularChange = normalizeAngle(after.angle - before.angle);
+          sample.cornerSeverity = clamp((Math.abs(angularChange) - 0.035) / 0.5, 0, 1);
+          sample.turnSign = Math.sign(angularChange);
+        });
+
+        const apexCandidates = [];
+        segments.forEach((segment, segmentIndex) => {
+          const candidates = samples.filter((sample) => sample.segmentIndex === segmentIndex);
+          const apex = candidates.reduce((best, sample) => (
+            sample.cornerSeverity > best.cornerSeverity ? sample : best
+          ), candidates[0]);
+          if (apex.cornerSeverity > 0.34) apexCandidates.push(apex);
+        });
+        const apexes = apexCandidates.filter((apex, index, list) => (
+          index === 0 || apex.distance - list[index - 1].distance > trackLength * 0.035
+        ));
+
+        return { samples, trackLength, apexes };
+      }
+
+      function getCircuitPositionAtViewDistance(distance, lateralOffset = 0) {
+        const { pathSamples, trackLength } = state.view;
+        const localDistance = ((distance % trackLength) + trackLength) % trackLength;
+        let low = 0;
+        let high = pathSamples.length - 1;
+        while (low < high) {
+          const middle = Math.floor((low + high) / 2);
+          if (pathSamples[middle].distance < localDistance) low = middle + 1;
+          else high = middle;
+        }
+        const after = pathSamples[low];
+        const before = pathSamples[Math.max(0, low - 1)];
+        const span = Math.max(0.0001, after.distance - before.distance);
+        const ratio = clamp((localDistance - before.distance) / span, 0, 1);
+        const angle = before.angle + normalizeAngle(after.angle - before.angle) * ratio;
+        const normalX = -Math.sin(angle);
+        const normalZ = Math.cos(angle);
+        const x = lerp(before.x, after.x, ratio);
+        const z = lerp(before.z, after.z, ratio);
+        return {
+          x: x + normalX * lateralOffset,
+          y: 0,
+          z: z + normalZ * lateralOffset,
+          angle,
+          normalX,
+          normalZ,
+          cornerSeverity: lerp(before.cornerSeverity, after.cornerSeverity, ratio),
+          turnSign: ratio > 0.5 ? after.turnSign : before.turnSign
+        };
+      }
+
+      // Contrato preservado: distância lógica acumulada entra, pose contínua sai.
+      function getPositionAtDistance(distance, lateralOffset = 0) {
+        const viewDistance = distance / LOGICAL_LAP_LENGTH * state.view.trackLength;
+        return getCircuitPositionAtViewDistance(viewDistance, lateralOffset);
+      }
+
+      function createRibbonGeometry(samples, width) {
+        const positions = [];
+        const indices = [];
+        samples.forEach((sample) => {
+          const normalX = -Math.sin(sample.angle);
+          const normalZ = Math.cos(sample.angle);
+          positions.push(
+            sample.x + normalX * width / 2, 0.035, sample.z + normalZ * width / 2,
+            sample.x - normalX * width / 2, 0.035, sample.z - normalZ * width / 2
+          );
+        });
+        for (let index = 0; index < samples.length - 1; index += 1) {
+          const base = index * 2;
+          indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return geometry;
+      }
+
+      function createOffsetLine(offset, color, opacity) {
+        const points = state.view.pathSamples.map((sample) => {
+          const normalX = -Math.sin(sample.angle);
+          const normalZ = Math.cos(sample.angle);
+          return new THREE.Vector3(sample.x + normalX * offset, 0.075, sample.z + normalZ * offset);
+        });
+        return new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(points),
+          new THREE.LineBasicMaterial({ color, transparent: true, opacity })
+        );
+      }
+
+      function createTrackScene() {
+        const ground = new THREE.Mesh(
+          new THREE.PlaneGeometry(38, 27),
+          new THREE.MeshStandardMaterial({ color: 0x0b1218, roughness: 1, metalness: 0 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.03;
+        scene.add(ground);
+
+        const grid = new THREE.GridHelper(38, 38, 0x263443, 0x17212b);
+        grid.position.y = 0;
+        grid.material.transparent = true;
+        grid.material.opacity = 0.3;
+        scene.add(grid);
+
+        const track = new THREE.Mesh(
+          createRibbonGeometry(state.view.pathSamples, state.view.trackWidth),
+          new THREE.MeshStandardMaterial({ color: 0x222b35, roughness: 0.94, metalness: 0.04, flatShading: true })
+        );
+        scene.add(track);
+        scene.add(createOffsetLine(state.view.trackWidth / 2 - 0.08, 0xcad3dd, 0.5));
+        scene.add(createOffsetLine(-state.view.trackWidth / 2 + 0.08, 0xcad3dd, 0.5));
+
+        const curbMaterials = [
+          new THREE.MeshStandardMaterial({ color: 0xf3f6f8, roughness: 0.8, flatShading: true }),
+          new THREE.MeshStandardMaterial({ color: 0xe13b4e, roughness: 0.8, flatShading: true })
+        ];
+        state.view.apexes.forEach((apex) => {
+          const logicalApex = apex.distance / state.view.trackLength * LOGICAL_LAP_LENGTH;
+          for (let stripe = -2; stripe <= 2; stripe += 1) {
+            const pose = getPositionAtDistance(logicalApex + stripe * 8, apex.turnSign * state.view.trackWidth / 2);
+            const curb = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.08, 0.24), curbMaterials[Math.abs(stripe) % 2]);
+            curb.position.set(pose.x, 0.08, pose.z);
+            curb.rotation.y = -pose.angle;
+            scene.add(curb);
+          }
+        });
+
+        const finishPose = getPositionAtDistance(0);
+        const checkerSize = state.view.trackWidth / 10;
+        const checkerMaterials = [
+          new THREE.MeshBasicMaterial({ color: 0xf4f7fa }),
+          new THREE.MeshBasicMaterial({ color: 0x1c242d })
+        ];
+        for (let row = 0; row < 10; row += 1) {
+          for (let column = 0; column < 2; column += 1) {
+            const lateral = -state.view.trackWidth / 2 + checkerSize * (row + 0.5);
+            const forward = (column - 0.5) * 0.24;
+            const tile = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.045, checkerSize), checkerMaterials[(row + column) % 2]);
+            tile.position.set(
+              finishPose.x + Math.cos(finishPose.angle) * forward + finishPose.normalX * lateral,
+              0.082,
+              finishPose.z + Math.sin(finishPose.angle) * forward + finishPose.normalZ * lateral
+            );
+            tile.rotation.y = -finishPose.angle;
+            scene.add(tile);
+          }
+        }
+      }
+
+      function createLowPolyCar(runner) {
+        const group = new THREE.Group();
+        group.rotation.order = 'YXZ';
+        const bodyMaterial = new THREE.MeshStandardMaterial({ color: runner.color, roughness: 0.52, metalness: 0.16, flatShading: true });
+        const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x070a0e, roughness: 0.82, flatShading: true });
+        const highlightMaterial = new THREE.MeshStandardMaterial({ color: 0xeef5fb, roughness: 0.45, flatShading: true });
+
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.28, 0.34), bodyMaterial);
+        chassis.position.y = 0.25;
+        group.add(chassis);
+
+        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.15, 0.18), bodyMaterial);
+        nose.position.set(0.65, 0.22, 0);
+        group.add(nose);
+
+        const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.92), bodyMaterial);
+        frontWing.position.set(0.96, 0.17, 0);
+        group.add(frontWing);
+
+        const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.24, 0.74), bodyMaterial);
+        rearWing.position.set(-0.63, 0.33, 0);
+        group.add(rearWing);
+
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 5), darkMaterial);
+        cockpit.scale.set(1.2, 0.75, 0.9);
+        cockpit.position.set(-0.05, 0.43, 0);
+        group.add(cockpit);
+
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.02, 0.06), highlightMaterial);
+        stripe.position.set(0.58, 0.305, 0);
+        group.add(stripe);
+
+        const wheelGeometry = new THREE.CylinderGeometry(0.16, 0.16, 0.16, 8);
+        [[-0.38, -0.34], [-0.38, 0.34], [0.42, -0.34], [0.42, 0.34]].forEach(([x, z]) => {
+          const wheel = new THREE.Mesh(wheelGeometry, darkMaterial);
+          wheel.rotation.x = Math.PI / 2;
+          wheel.position.set(x, 0.18, z);
+          group.add(wheel);
+        });
+
+        const glow = new THREE.Mesh(
+          new THREE.CircleGeometry(0.62, 20),
+          new THREE.MeshBasicMaterial({ color: runner.color, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending })
+        );
+        glow.rotation.x = -Math.PI / 2;
+        glow.position.y = 0.055;
+        glow.scale.set(1.8, 0.72, 1);
+        group.add(glow);
+        return group;
+      }
+
+      function createTrailObject(runner) {
+        const maxPoints = 34;
+        const positions = new Float32Array(maxPoints * 3);
+        const geometry = new THREE.BufferGeometry();
+        const attribute = new THREE.BufferAttribute(positions, 3);
+        attribute.setUsage(THREE.DynamicDrawUsage);
+        geometry.setAttribute('position', attribute);
+        geometry.setDrawRange(0, 0);
+        const material = new THREE.LineBasicMaterial({
+          color: runner.color,
+          transparent: true,
+          opacity: 0.48,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const line = new THREE.Line(geometry, material);
+        scene.add(line);
+        return { line, positions, history: [], maxPoints, lastDistance: Infinity };
+      }
+
+      function initThreeScene() {
+        if (!window.THREE) {
+          elements.raceStateLabel.textContent = 'Three.js indisponível';
+          return;
+        }
+        renderer = new THREE.WebGLRenderer({
+          canvas: elements.canvas,
+          antialias: true,
+          alpha: false,
+          powerPreference: 'high-performance'
+        });
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.setClearColor(0x080c11, 1);
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x080c11);
+        scene.fog = new THREE.Fog(0x080c11, 31, 52);
+        camera = new THREE.OrthographicCamera(-18, 18, 12, -12, 0.1, 100);
+        camera.position.set(0, 24, 20);
+        camera.lookAt(0, 0, 0);
+
+        scene.add(new THREE.HemisphereLight(0xdcecff, 0x10151c, 2.35));
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.45);
+        keyLight.position.set(-8, 18, 11);
+        scene.add(keyLight);
+        const rimLight = new THREE.DirectionalLight(0x638dff, 0.65);
+        rimLight.position.set(14, 9, -10);
+        scene.add(rimLight);
+
+        createTrackScene();
+        state.race.runners.forEach((runner) => {
+          const group = createLowPolyCar(runner);
+          scene.add(group);
+          carObjects.set(runner.id, { group, trail: createTrailObject(runner) });
+        });
+      }
+
+      function updateTrail(runner, pose) {
+        const object = carObjects.get(runner.id);
+        if (!object) return;
+        const trail = object.trail;
+        if (runner.distance + 5 < trail.lastDistance) trail.history = [];
+        if (!trail.history.length || Math.abs(runner.distance - trail.lastDistance) >= 1.4) {
+          trail.history.push(new THREE.Vector3(pose.x, 0.16, pose.z));
+          if (trail.history.length > trail.maxPoints) trail.history.shift();
+          trail.lastDistance = runner.distance;
+        }
+        trail.history.forEach((point, index) => {
+          trail.positions[index * 3] = point.x;
+          trail.positions[index * 3 + 1] = point.y;
+          trail.positions[index * 3 + 2] = point.z;
+        });
+        trail.line.geometry.setDrawRange(0, trail.history.length);
+        trail.line.geometry.attributes.position.needsUpdate = true;
+        trail.line.material.opacity = runner.sprintTimer > 0 ? 0.9 : 0.48;
+      }
+
+      function getRunnerLap(runner) {
+        if (state.phase === 'finished' && runner.progress >= 1) return TOTAL_LAPS;
+        return clamp(Math.floor(runner.distance / LOGICAL_LAP_LENGTH) + 1, 1, TOTAL_LAPS);
+      }
+
+      function update3dTelemetry() {
+        if (!state.race || !elements.race3dHud) return;
+        const ranks = getRanks();
+        state.race.runners.forEach((runner) => {
+          const card = elements.race3dHud.querySelector(`[data-runner-id="${runner.id}"]`);
+          if (!card) return;
+          const rank = ranks.get(runner.id);
+          card.querySelector('[data-role="rank"]').textContent = state.phase === 'betting' ? 'P–' : `P${rank}`;
+          card.querySelector('[data-role="status"]').textContent = getRunnerStatus(runner, rank);
+          card.querySelector('[data-role="lap"]').textContent = `V${getRunnerLap(runner)}/${TOTAL_LAPS}`;
+        });
+        const leader = [...state.race.runners].sort((a, b) => b.progress - a.progress || b.velocity - a.velocity)[0];
+        elements.lap3d.textContent = `${getRunnerLap(leader)} / ${TOTAL_LAPS}`;
+      }
+
+      function drawRace() {
+        if (!renderer || !scene || !camera || !state.race) return;
+        const ranks = getRanks();
+        state.race.runners.forEach((runner) => {
+          const object = carObjects.get(runner.id);
+          if (!object) return;
+          const centerPose = getPositionAtDistance(runner.distance);
+          const baseLine = (runner.id - 2.5) * state.view.laneSpacing * 0.72;
+          const lineBias = [-1, 0.65, -0.55, 1][runner.id - 1] * state.view.laneSpacing * 0.32;
+          const dynamicLine = lineBias * centerPose.cornerSeverity * (centerPose.turnSign || 1);
+          const laneOffset = clamp(
+            baseLine + dynamicLine + runner.driftOffset,
+            -state.view.trackWidth / 2 + 0.38,
+            state.view.trackWidth / 2 - 0.38
+          );
+          const pose = getPositionAtDistance(runner.distance, laneOffset);
+          object.group.position.set(pose.x, 0.08, pose.z);
+          object.group.rotation.y = -pose.angle;
+          object.group.rotation.x = -pose.turnSign * pose.cornerSeverity * 0.1;
+          const pulse = runner.sprintTimer > 0 ? 1.08 : 1;
+          object.group.scale.setScalar(pulse);
+          updateTrail(runner, pose);
+          object.group.renderOrder = ranks.get(runner.id);
+        });
+        renderer.render(scene, camera);
+      }
+
+      function handleCountdown(now) {
+        const elapsed = (now - state.race.countdownStartedAt) / 1000;
+        let title = '03';
+        let subtitle = 'Sincronizando largada';
+        if (elapsed >= 1 && elapsed < 2) title = '02';
+        if (elapsed >= 2 && elapsed < 3) title = '01';
+        if (elapsed >= 3 && elapsed < 3.55) {
+          title = 'GO';
+          subtitle = 'Corrida liberada';
+        }
+        showRaceBanner(title, subtitle);
+        if (elapsed >= 3.28) startLiveRace();
+      }
+
+      function animationLoop(now) {
+        if (state.phase === 'countdown') {
+          handleCountdown(now);
+        } else if (state.phase === 'racing') {
+          if (state.lastFrame === null) state.lastFrame = now;
+          const frameDelta = Math.min(MAX_FRAME_DELTA, Math.max(0, (now - state.lastFrame) / 1000));
+          state.lastFrame = now;
+          updateRace(frameDelta);
+        } else {
+          state.lastFrame = now;
+        }
+
+        drawRace();
+
+        if (now - state.lastUiUpdate > 80) {
+          if (state.phase === 'racing' || state.phase === 'finished') {
+            elements.raceClock.textContent = formatTime(state.race.elapsedReal);
+          }
+          update3dTelemetry();
+          state.lastUiUpdate = now;
+        }
+
+        state.animationId = requestAnimationFrame(animationLoop);
+      }
+
+      function bindEvents() {
+        elements.friendForm.addEventListener('submit', addFriend);
+        elements.betForm.addEventListener('submit', placeBet);
+        elements.betAmount.addEventListener('input', updateBetPreview);
+        elements.betFriend.addEventListener('change', updateBetPreview);
+        elements.betForm.querySelectorAll('input[name="betType"]').forEach((input) => {
+          input.addEventListener('change', updateBetPreview);
+        });
+        elements.startRaceButton.addEventListener('click', beginRace);
+        elements.clearSessionButton.addEventListener('click', clearSession);
+        elements.reviewResultButton.addEventListener('click', () => closeResultOverlay(true));
+        elements.newRaceButton.addEventListener('click', prepareNewRound);
+        elements.resultOverlay.addEventListener('click', (event) => {
+          if (event.target === elements.resultOverlay) {
+            closeResultOverlay(true);
+          }
+        });
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && !elements.resultOverlay.hidden) {
+            closeResultOverlay(true);
+          }
+        });
+        window.addEventListener('storage', (event) => {
+          if (event.key !== ACTIVE_RACE_KEY) return;
+          if ((state.phase === 'external' && !event.newValue) || (state.phase === 'betting' && event.newValue)) {
+            window.location.reload();
+          }
+        });
+        window.setInterval(() => {
+          if (state.phase === 'countdown' || state.phase === 'racing') {
+            markRaceActive();
+            state.race.lastHeartbeat = Date.now();
+          }
+        }, 2000);
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            state.lastFrame = null;
+          } else if (state.phase === 'racing') {
+            state.lastFrame = performance.now();
+          }
+        });
+      }
+
+      function init() {
+        loadState();
+        buildRunnerChoices();
+        bindEvents();
+        resetRunnersForLobby();
+        renderDashboard();
+
+        const resizeObserver = new ResizeObserver(resizeCanvas);
+        resizeObserver.observe(elements.canvas);
+        resizeCanvas();
+        state.animationId = requestAnimationFrame(animationLoop);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
+
