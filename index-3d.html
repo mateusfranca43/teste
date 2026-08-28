@@ -1162,6 +1162,10 @@
       const LOGICAL_LAP_LENGTH = 1000;
       const TOTAL_RACE_DISTANCE = LOGICAL_LAP_LENGTH * TOTAL_LAPS;
       const MAX_DRIFT_OFFSET = 0.38;
+      const TRACK_WIDTH = 4.2;
+      const TRACK_BARRIER_WIDTH = 0.275;
+      const TRACK_CLEARANCE_MARGIN = 2.5;
+      const MIN_TRACK_CLEARANCE = TRACK_WIDTH + TRACK_BARRIER_WIDTH + TRACK_CLEARANCE_MARGIN;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const TAB_ID = (() => {
         try {
@@ -2373,7 +2377,7 @@
           dpr,
           centerY: height / 2,
           trackLength: circuit.trackLength,
-          trackWidth: 4.2,
+          trackWidth: TRACK_WIDTH,
           laneSpacing: 0.9,
           pathSamples: circuit.samples,
           apexes: circuit.apexes,
@@ -2397,13 +2401,13 @@
       // entre trechos não adjacentes, evitando sobreposição da pista e dos muros.
       const CIRCUIT_SEGMENTS = [
         { from: [.13, .80], c1: [.30, .80], c2: [.52, .80], to: [.68, .80] },
-        { c1: [.83, .80], c2: [.92, .72], to: [.88, .62] },
-        { c1: [.90, .50], c2: [.90, .35], to: [.82, .28] },
-        { c1: [.74, .14], c2: [.66, .14], to: [.58, .16] },
-        { c1: [.46, .16], c2: [.34, .16], to: [.26, .18] },
-        { c1: [.10, .18], c2: [.04, .30], to: [.08, .42] },
-        { c1: [.07, .53], c2: [.10, .60], to: [.16, .64] },
-        { c1: [.23, .68], c2: [.19, .78], to: [.13, .80] }
+        { c1: [.80, .80], c2: [.90, .73], to: [.88, .62] },
+        { c1: [.89, .50], c2: [.88, .36], to: [.82, .28] },
+        { c1: [.76, .19], c2: [.67, .15], to: [.58, .16] },
+        { c1: [.47, .15], c2: [.35, .16], to: [.26, .18] },
+        { c1: [.15, .20], c2: [.08, .30], to: [.08, .42] },
+        { c1: [.08, .49], c2: [.10, .57], to: [.12, .60] },
+        { c1: [.16, .66], c2: [.16, .75], to: [.13, .80] }
       ];
 
       function cubicPoint(p0, p1, p2, p3, t) {
@@ -2421,6 +2425,98 @@
         return {
           x: 3 * inverse * inverse * (p1.x - p0.x) + 6 * inverse * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x),
           z: 3 * inverse * inverse * (p1.z - p0.z) + 6 * inverse * t * (p2.z - p1.z) + 3 * t * t * (p3.z - p2.z)
+        };
+      }
+
+      function pointToSegmentDistance(point, start, end) {
+        const deltaX = end.x - start.x;
+        const deltaZ = end.z - start.z;
+        const lengthSquared = deltaX * deltaX + deltaZ * deltaZ;
+        if (lengthSquared < 1e-9) return Math.hypot(point.x - start.x, point.z - start.z);
+        const projection = clamp(
+          ((point.x - start.x) * deltaX + (point.z - start.z) * deltaZ) / lengthSquared,
+          0,
+          1
+        );
+        return Math.hypot(
+          point.x - (start.x + deltaX * projection),
+          point.z - (start.z + deltaZ * projection)
+        );
+      }
+
+      function orientation(a, b, c) {
+        return (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
+      }
+
+      function pointIsOnSegment(point, start, end, epsilon = 1e-7) {
+        return Math.abs(orientation(start, end, point)) <= epsilon &&
+          point.x >= Math.min(start.x, end.x) - epsilon &&
+          point.x <= Math.max(start.x, end.x) + epsilon &&
+          point.z >= Math.min(start.z, end.z) - epsilon &&
+          point.z <= Math.max(start.z, end.z) + epsilon;
+      }
+
+      function lineSegmentsIntersect(a, b, c, d) {
+        const abC = orientation(a, b, c);
+        const abD = orientation(a, b, d);
+        const cdA = orientation(c, d, a);
+        const cdB = orientation(c, d, b);
+        if (abC * abD < 0 && cdA * cdB < 0) return true;
+        return pointIsOnSegment(c, a, b) ||
+          pointIsOnSegment(d, a, b) ||
+          pointIsOnSegment(a, c, d) ||
+          pointIsOnSegment(b, c, d);
+      }
+
+      function lineSegmentDistance(a, b, c, d) {
+        if (lineSegmentsIntersect(a, b, c, d)) return 0;
+        return Math.min(
+          pointToSegmentDistance(a, c, d),
+          pointToSegmentDistance(b, c, d),
+          pointToSegmentDistance(c, a, b),
+          pointToSegmentDistance(d, a, b)
+        );
+      }
+
+      // Regra estrutural: compara todos os pequenos segmentos de reta gerados pela
+      // amostragem de Bézier. Apenas setores lógicos vizinhos são ignorados, pois
+      // compartilham a mesma curva. Qualquer outro trecho precisa respeitar toda a
+      // largura da pista, do muro e a margem de segurança definida acima.
+      function validateCircuitSpacing(samples, minimumClearance = MIN_TRACK_CLEARANCE) {
+        const sampledSegments = samples.slice(0, -1).map((sample, index) => ({
+          start: sample,
+          end: samples[index + 1],
+          logicalSegment: samples[index + 1].segmentIndex
+        }));
+        const logicalSegmentCount = CIRCUIT_SEGMENTS.length;
+        const violations = [];
+        let closestDistance = Infinity;
+
+        for (let firstIndex = 0; firstIndex < sampledSegments.length; firstIndex += 1) {
+          const first = sampledSegments[firstIndex];
+          for (let secondIndex = firstIndex + 1; secondIndex < sampledSegments.length; secondIndex += 1) {
+            const second = sampledSegments[secondIndex];
+            const rawGap = Math.abs(first.logicalSegment - second.logicalSegment);
+            const circularGap = Math.min(rawGap, logicalSegmentCount - rawGap);
+            if (circularGap <= 1) continue;
+
+            const distance = lineSegmentDistance(first.start, first.end, second.start, second.end);
+            closestDistance = Math.min(closestDistance, distance);
+            if (distance < minimumClearance) {
+              violations.push({
+                firstSegment: first.logicalSegment,
+                secondSegment: second.logicalSegment,
+                distance
+              });
+            }
+          }
+        }
+
+        return {
+          valid: violations.length === 0,
+          minimumClearance,
+          closestDistance,
+          violations
         };
       }
 
@@ -2485,7 +2581,16 @@
           maxZ: Math.max(result.maxZ, sample.z)
         }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
 
-        return { samples, trackLength, apexes, bounds };
+        const spacingReport = validateCircuitSpacing(samples);
+        if (!spacingReport.valid) {
+          const firstViolation = spacingReport.violations[0];
+          throw new Error(
+            `Circuito inválido: setores ${firstViolation.firstSegment} e ${firstViolation.secondSegment} ` +
+            `estão a ${firstViolation.distance.toFixed(2)}u; mínimo ${spacingReport.minimumClearance.toFixed(2)}u.`
+          );
+        }
+
+        return { samples, trackLength, apexes, bounds, spacingReport };
       }
 
       function getCircuitPositionAtViewDistance(distance, lateralOffset = 0) {
@@ -2618,7 +2723,7 @@
           scene.add(wall);
 
           const stripe = new THREE.Mesh(
-            createTrackBarrierGeometry(state.view.pathSamples, offset, 0.34, 0.58, 0.275),
+            createTrackBarrierGeometry(state.view.pathSamples, offset, 0.34, 0.58, TRACK_BARRIER_WIDTH),
             stripeMaterial
           );
           stripe.castShadow = true;
@@ -2749,47 +2854,105 @@
         createEnvironmentProps();
       }
 
+      function createTaperedPrismGeometry(length, height, rearWidth, frontWidth) {
+        const rearX = -length / 2;
+        const frontX = length / 2;
+        const rearHalfWidth = rearWidth / 2;
+        const frontHalfWidth = frontWidth / 2;
+        const positions = [
+          rearX, 0, -rearHalfWidth,
+          rearX, 0, rearHalfWidth,
+          frontX, 0, -frontHalfWidth,
+          frontX, 0, frontHalfWidth,
+          rearX, height, -rearHalfWidth,
+          rearX, height, rearHalfWidth,
+          frontX, height, -frontHalfWidth,
+          frontX, height, frontHalfWidth
+        ];
+        const indices = [
+          0, 2, 1, 1, 2, 3,
+          4, 5, 6, 5, 7, 6,
+          0, 4, 2, 2, 4, 6,
+          1, 3, 5, 3, 7, 5,
+          0, 1, 4, 1, 5, 4,
+          2, 6, 3, 3, 6, 7
+        ];
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return geometry;
+      }
+
       function createLowPolyCar(runner) {
         const group = new THREE.Group();
         group.rotation.order = 'YXZ';
-        const bodyMaterial = new THREE.MeshStandardMaterial({ color: runner.color, roughness: 0.52, metalness: 0.16, flatShading: true });
-        const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x070a0e, roughness: 0.82, flatShading: true });
-        const highlightMaterial = new THREE.MeshStandardMaterial({ color: 0xeef5fb, roughness: 0.45, flatShading: true });
+        const bodyMaterial = new THREE.MeshStandardMaterial({
+          color: runner.color,
+          roughness: 0.48,
+          metalness: 0.16,
+          flatShading: true
+        });
+        const darkMaterial = new THREE.MeshStandardMaterial({
+          color: 0x111820,
+          roughness: 0.86,
+          metalness: 0.05,
+          flatShading: true
+        });
+        const tireMaterial = new THREE.MeshStandardMaterial({
+          color: 0x05070a,
+          roughness: 0.96,
+          metalness: 0,
+          flatShading: true
+        });
 
-        const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.4, 0.42), bodyMaterial);
-        chassis.position.y = 0.34;
+        // A carroceria e o bico afunilam na direção +X, frente lógica do carro.
+        const chassis = new THREE.Mesh(
+          createTaperedPrismGeometry(1.28, 0.32, 0.5, 0.27),
+          bodyMaterial
+        );
+        chassis.position.set(-0.08, 0.23, 0);
         group.add(chassis);
 
-        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.2, 0.2), bodyMaterial);
-        nose.position.set(0.69, 0.3, 0);
+        const nose = new THREE.Mesh(
+          createTaperedPrismGeometry(0.72, 0.16, 0.28, 0.11),
+          bodyMaterial
+        );
+        nose.position.set(0.76, 0.24, 0);
         group.add(nose);
 
-        const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.98), bodyMaterial);
-        frontWing.position.set(1.01, 0.22, 0);
+        const engineCover = new THREE.Mesh(
+          createTaperedPrismGeometry(0.5, 0.25, 0.3, 0.2),
+          bodyMaterial
+        );
+        engineCover.position.set(-0.34, 0.51, 0);
+        group.add(engineCover);
+
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 5), darkMaterial);
+        cockpit.scale.set(1.35, 0.72, 0.9);
+        cockpit.position.set(0.03, 0.58, 0);
+        group.add(cockpit);
+
+        const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.94), darkMaterial);
+        frontWing.position.set(1.13, 0.17, 0);
         group.add(frontWing);
 
-        const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.32, 0.8), bodyMaterial);
-        rearWing.position.set(-0.68, 0.43, 0);
+        const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.82), darkMaterial);
+        rearWing.position.set(-0.79, 0.63, 0);
         group.add(rearWing);
 
         [-1, 1].forEach((side) => {
-          const sidepod = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.3, 0.24), bodyMaterial);
-          sidepod.position.set(-0.08, 0.31, side * 0.31);
-          group.add(sidepod);
+          const rearWingStrut = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.32, 0.07), darkMaterial);
+          rearWingStrut.position.set(-0.75, 0.46, side * 0.27);
+          group.add(rearWingStrut);
         });
 
-        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 5), darkMaterial);
-        cockpit.scale.set(1.2, 0.75, 0.9);
-        cockpit.position.set(-0.08, 0.57, 0);
-        group.add(cockpit);
-
-        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.02, 0.06), highlightMaterial);
-        stripe.position.set(0.6, 0.51, 0);
-        group.add(stripe);
-
-        const wheelGeometry = new THREE.CylinderGeometry(0.19, 0.19, 0.22, 8);
-        [[-0.4, -0.4], [-0.4, 0.4], [0.45, -0.4], [0.45, 0.4]].forEach(([x, z]) => {
-          const wheel = new THREE.Mesh(wheelGeometry, darkMaterial);
+        const wheelGeometry = new THREE.CylinderGeometry(0.19, 0.19, 0.17, 10);
+        [
+          [-0.46, -0.38], [-0.46, 0.38],
+          [0.5, -0.35], [0.5, 0.35]
+        ].forEach(([x, z]) => {
+          const wheel = new THREE.Mesh(wheelGeometry, tireMaterial);
           wheel.rotation.x = Math.PI / 2;
           wheel.position.set(x, 0.22, z);
           group.add(wheel);
