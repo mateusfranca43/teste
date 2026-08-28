@@ -195,6 +195,22 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
       backdrop-filter: blur(10px);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    }
+
+    .race-3d-card:hover,
+    .race-3d-card:focus-visible,
+    .race-3d-card.is-camera-target {
+      border-color: rgba(var(--runner-rgb), .9);
+      box-shadow: 0 0 0 1px rgba(var(--runner-rgb), .22), 0 10px 30px rgba(0, 0, 0, .32);
+      outline: none;
+    }
+
+    .race-3d-card.is-camera-target {
+      transform: translateY(2px);
+      background: rgba(9, 15, 23, .99);
     }
 
     .race-3d-card__top,
@@ -247,6 +263,21 @@
       color: #f5f7fa;
       font-size: 18px;
       letter-spacing: .08em;
+    }
+
+    .race-minimap {
+      position: absolute;
+      z-index: 4;
+      right: 16px;
+      bottom: 16px;
+      width: clamp(170px, 22vw, 250px);
+      aspect-ratio: 1.55;
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 12px;
+      background: rgba(5, 10, 16, .9);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, .34);
+      backdrop-filter: blur(10px);
+      pointer-events: none;
     }
 
     .race-banner {
@@ -845,6 +876,13 @@
         white-space: nowrap;
       }
 
+      .race-minimap {
+        right: 8px;
+        bottom: 8px;
+        width: 142px;
+        border-radius: 9px;
+      }
+
       .runner-choice {
         min-height: 62px;
         padding: 10px;
@@ -928,24 +966,25 @@
 
       <div class="race-shell">
         <canvas id="raceCanvas" role="img" aria-label="Experimento 3D com circuito e quatro carros coloridos em duas voltas"></canvas>
-        <div id="race3dHud" class="race-3d-hud" aria-hidden="true">
-          <div class="race-3d-card" data-runner-id="1" style="--runner-rgb: 47, 140, 255">
+        <div id="race3dHud" class="race-3d-hud" aria-label="Selecionar câmera do corredor">
+          <div class="race-3d-card" data-runner-id="1" role="button" tabindex="0" aria-label="Seguir corredor 1" aria-pressed="true" style="--runner-rgb: 47, 140, 255">
             <div class="race-3d-card__top"><span>C1 · 1.5×</span><strong data-role="rank">P–</strong></div>
             <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
           </div>
-          <div class="race-3d-card" data-runner-id="2" style="--runner-rgb: 62, 230, 168">
+          <div class="race-3d-card" data-runner-id="2" role="button" tabindex="0" aria-label="Seguir corredor 2" aria-pressed="false" style="--runner-rgb: 62, 230, 168">
             <div class="race-3d-card__top"><span>C2 · 7.0×</span><strong data-role="rank">P–</strong></div>
             <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
           </div>
-          <div class="race-3d-card" data-runner-id="3" style="--runner-rgb: 180, 92, 255">
+          <div class="race-3d-card" data-runner-id="3" role="button" tabindex="0" aria-label="Seguir corredor 3" aria-pressed="false" style="--runner-rgb: 180, 92, 255">
             <div class="race-3d-card__top"><span>C3 · 3.5×</span><strong data-role="rank">P–</strong></div>
             <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
           </div>
-          <div class="race-3d-card" data-runner-id="4" style="--runner-rgb: 255, 122, 26">
+          <div class="race-3d-card" data-runner-id="4" role="button" tabindex="0" aria-label="Seguir corredor 4" aria-pressed="false" style="--runner-rgb: 255, 122, 26">
             <div class="race-3d-card__top"><span>C4 · 2.5×</span><strong data-role="rank">P–</strong></div>
             <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
           </div>
         </div>
+        <canvas id="raceMinimap" class="race-minimap" role="img" aria-label="Mapa geral da pista com a posição dos quatro corredores"></canvas>
         <div class="lap-3d" aria-hidden="true">Volta<strong id="lap3d">1 / 2</strong></div>
         <div id="raceBanner" class="race-banner" aria-hidden="true">
           <strong id="raceBannerTitle">03</strong>
@@ -1184,6 +1223,7 @@
         racePanel: document.querySelector('#racePanel'),
         canvas: document.querySelector('#raceCanvas'),
         race3dHud: document.querySelector('#race3dHud'),
+        raceMinimap: document.querySelector('#raceMinimap'),
         lap3d: document.querySelector('#lap3d'),
         raceBanner: document.querySelector('#raceBanner'),
         raceBannerTitle: document.querySelector('#raceBannerTitle'),
@@ -1243,6 +1283,12 @@
         dialogReturnFocus: null,
         race: null,
         view: { width: 0, height: 0, dpr: 1 },
+        cameraTargetRunnerId: 1,
+        cameraPosition: null,
+        cameraLookAt: null,
+        cameraDesiredPosition: null,
+        cameraDesiredLookAt: null,
+        lastCameraFrame: null,
         lastFrame: null,
         lastUiUpdate: 0,
         animationId: 0
@@ -2330,7 +2376,8 @@
           trackWidth: 4.2,
           laneSpacing: 0.9,
           pathSamples: circuit.samples,
-          apexes: circuit.apexes
+          apexes: circuit.apexes,
+          bounds: circuit.bounds
         };
 
         if (!renderer) initThreeScene();
@@ -2340,29 +2387,23 @@
         renderer.setSize(width, height, false);
         const aspect = width / height;
         const narrowPortrait = aspect < 0.82;
-        const nearSquare = aspect < 1.25;
         camera.aspect = aspect;
-        camera.fov = narrowPortrait ? 51 : nearSquare ? 43 : 38;
-        const cameraDistance = narrowPortrait ? 31 : nearSquare ? 28 : 24;
-        camera.position.set(0, cameraDistance * 0.92, cameraDistance);
-        camera.lookAt(0, 0.25, 0);
+        camera.fov = narrowPortrait ? 58 : 50;
         camera.updateProjectionMatrix();
-        drawRace();
+        drawRace(1 / 60);
       }
 
-      // O mesmo desenho lógico da V3, agora amostrado no plano X/Z do Three.js.
+      // Circuito amplo: os setores ocupam o perímetro e mantêm grande distância
+      // entre trechos não adjacentes, evitando sobreposição da pista e dos muros.
       const CIRCUIT_SEGMENTS = [
-        { from: [.12, .86], c1: [.32, .86], c2: [.60, .86], to: [.78, .86] },
-        { c1: [.96, .86], c2: [.97, .58], to: [.74, .58] },
-        { c1: [.64, .58], c2: [.57, .54], to: [.50, .52] },
-        { c1: [.44, .48], c2: [.41, .36], to: [.33, .42] },
-        { c1: [.25, .47], c2: [.27, .26], to: [.18, .31] },
-        { c1: [.14, .15], c2: [.39, .10], to: [.50, .17] },
-        { c1: [.60, .24], c2: [.59, .34], to: [.68, .28] },
-        { c1: [.77, .22], c2: [.88, .26], to: [.84, .39] },
-        { c1: [.88, .50], c2: [.75, .57], to: [.64, .57] },
-        { c1: [.55, .57], c2: [.47, .61], to: [.40, .64] },
-        { c1: [.18, .61], c2: [.02, .82], to: [.12, .86] }
+        { from: [.13, .80], c1: [.30, .80], c2: [.52, .80], to: [.68, .80] },
+        { c1: [.83, .80], c2: [.92, .72], to: [.88, .62] },
+        { c1: [.90, .50], c2: [.90, .35], to: [.82, .28] },
+        { c1: [.74, .14], c2: [.66, .14], to: [.58, .16] },
+        { c1: [.46, .16], c2: [.34, .16], to: [.26, .18] },
+        { c1: [.10, .18], c2: [.04, .30], to: [.08, .42] },
+        { c1: [.07, .53], c2: [.10, .60], to: [.16, .64] },
+        { c1: [.23, .68], c2: [.19, .78], to: [.13, .80] }
       ];
 
       function cubicPoint(p0, p1, p2, p3, t) {
@@ -2384,7 +2425,7 @@
       }
 
       function buildCircuitGeometry() {
-        const mapPoint = ([x, z]) => ({ x: (x - 0.5) * 30, z: (z - 0.5) * 19 });
+        const mapPoint = ([x, z]) => ({ x: (x - 0.5) * 64, z: (z - 0.5) * 42 });
         const segments = [];
         let current = mapPoint(CIRCUIT_SEGMENTS[0].from);
         CIRCUIT_SEGMENTS.forEach((segment) => {
@@ -2437,7 +2478,14 @@
           index === 0 || apex.distance - list[index - 1].distance > trackLength * 0.035
         ));
 
-        return { samples, trackLength, apexes };
+        const bounds = samples.reduce((result, sample) => ({
+          minX: Math.min(result.minX, sample.x),
+          maxX: Math.max(result.maxX, sample.x),
+          minZ: Math.min(result.minZ, sample.z),
+          maxZ: Math.max(result.maxZ, sample.z)
+        }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+
+        return { samples, trackLength, apexes, bounds };
       }
 
       function getCircuitPositionAtViewDistance(distance, lateralOffset = 0) {
@@ -2630,7 +2678,7 @@
         );
         sand.rotation.x = -Math.PI / 2;
         sand.scale.set(1, 0.62, 1);
-        sand.position.set(12.3, -0.052, -7.7);
+        sand.position.set(0, -0.052, 0);
         sand.receiveShadow = true;
         scene.add(sand);
 
@@ -2640,7 +2688,7 @@
         );
         water.rotation.x = -Math.PI / 2;
         water.scale.set(1, 0.58, 1);
-        water.position.set(12.3, -0.042, -7.7);
+        water.position.set(0, -0.042, 0);
         water.receiveShadow = true;
         scene.add(water);
       }
@@ -2653,7 +2701,7 @@
 
       function createTrackScene() {
         const ground = new THREE.Mesh(
-          new THREE.PlaneGeometry(48, 34, 1, 1),
+          new THREE.PlaneGeometry(76, 54, 1, 1),
           new THREE.MeshStandardMaterial({ color: 0x7dbd5f, roughness: 1, metalness: 0, flatShading: true })
         );
         ground.rotation.x = -Math.PI / 2;
@@ -2804,9 +2852,13 @@
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x8fcfe3);
         scene.fog = new THREE.Fog(0x8fcfe3, 55, 86);
-        camera = new THREE.PerspectiveCamera(40, 1, 0.1, 120);
-        camera.position.set(0, 26, 26);
-        camera.lookAt(0, 0.25, 0);
+        camera = new THREE.PerspectiveCamera(50, 1, 0.1, 140);
+        state.cameraPosition = new THREE.Vector3(0, 6, 10);
+        state.cameraLookAt = new THREE.Vector3(0, 0.4, 0);
+        state.cameraDesiredPosition = new THREE.Vector3();
+        state.cameraDesiredLookAt = new THREE.Vector3();
+        camera.position.copy(state.cameraPosition);
+        camera.lookAt(state.cameraLookAt);
 
         scene.add(new THREE.AmbientLight(0xfff4dc, 1.18));
         scene.add(new THREE.HemisphereLight(0xdff5ff, 0x6fa755, 1.42));
@@ -2814,10 +2866,10 @@
         keyLight.position.set(-12, 26, 12);
         keyLight.castShadow = true;
         keyLight.shadow.mapSize.set(2048, 2048);
-        keyLight.shadow.camera.left = -22;
-        keyLight.shadow.camera.right = 22;
-        keyLight.shadow.camera.top = 18;
-        keyLight.shadow.camera.bottom = -18;
+        keyLight.shadow.camera.left = -36;
+        keyLight.shadow.camera.right = 36;
+        keyLight.shadow.camera.top = 28;
+        keyLight.shadow.camera.bottom = -28;
         keyLight.shadow.camera.near = 1;
         keyLight.shadow.camera.far = 70;
         keyLight.shadow.bias = -0.00035;
@@ -2867,6 +2919,9 @@
           const card = elements.race3dHud.querySelector(`[data-runner-id="${runner.id}"]`);
           if (!card) return;
           const rank = ranks.get(runner.id);
+          const isCameraTarget = runner.id === state.cameraTargetRunnerId;
+          card.classList.toggle('is-camera-target', isCameraTarget);
+          card.setAttribute('aria-pressed', String(isCameraTarget));
           card.querySelector('[data-role="rank"]').textContent = state.phase === 'betting' ? 'P–' : `P${rank}`;
           card.querySelector('[data-role="status"]').textContent = getRunnerStatus(runner, rank);
           card.querySelector('[data-role="lap"]').textContent = `V${getRunnerLap(runner)}/${TOTAL_LAPS}`;
@@ -2877,7 +2932,115 @@
 
       const CAR_RACING_LINES = [-1.5, -0.5, 0.5, 1.5];
 
-      function drawRace() {
+      function selectCameraTarget(runnerId) {
+        if (!RUNNERS.some((runner) => runner.id === runnerId)) return;
+        state.cameraTargetRunnerId = runnerId;
+        update3dTelemetry();
+        announce(`Câmera acompanhando o corredor ${runnerId}.`);
+      }
+
+      function updateFollowCamera(deltaTime) {
+        if (!camera || !state.race || !state.cameraPosition || !state.cameraLookAt) return;
+        const runner = state.race.runners.find((item) => item.id === state.cameraTargetRunnerId) || state.race.runners[0];
+        const object = carObjects.get(runner.id);
+        if (!object) return;
+        const pose = object.pose || getPositionAtDistance(runner.distance);
+        const forwardX = Math.cos(pose.angle);
+        const forwardZ = Math.sin(pose.angle);
+        const chaseDistance = 7.8 + clamp(runner.velocity / 220, 0, 0.65);
+        const cameraHeight = 5.4 + clamp(runner.velocity / 260, 0, 0.4);
+
+        state.cameraDesiredPosition.set(
+          object.group.position.x - forwardX * chaseDistance,
+          cameraHeight,
+          object.group.position.z - forwardZ * chaseDistance
+        );
+        state.cameraDesiredLookAt.set(
+          object.group.position.x + forwardX * 2.4,
+          0.42,
+          object.group.position.z + forwardZ * 2.4
+        );
+
+        // Amortecimento exponencial independente de FPS: inclusive ao trocar
+        // de corredor, a câmera viaja até o novo alvo sem corte instantâneo.
+        const smoothing = 1 - Math.exp(-4.6 * clamp(deltaTime || 1 / 60, 0, 0.08));
+        state.cameraPosition.lerp(state.cameraDesiredPosition, smoothing);
+        state.cameraLookAt.lerp(state.cameraDesiredLookAt, smoothing);
+        camera.position.copy(state.cameraPosition);
+        camera.lookAt(state.cameraLookAt);
+      }
+
+      function drawMinimap() {
+        if (!elements.raceMinimap || !state.race || !state.view.bounds) return;
+        const rect = elements.raceMinimap.getBoundingClientRect();
+        if (rect.width < 20 || rect.height < 20) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const pixelWidth = Math.round(rect.width * dpr);
+        const pixelHeight = Math.round(rect.height * dpr);
+        if (elements.raceMinimap.width !== pixelWidth || elements.raceMinimap.height !== pixelHeight) {
+          elements.raceMinimap.width = pixelWidth;
+          elements.raceMinimap.height = pixelHeight;
+        }
+
+        const context = elements.raceMinimap.getContext('2d');
+        const width = rect.width;
+        const height = rect.height;
+        const paddingX = 15;
+        const paddingTop = 25;
+        const paddingBottom = 12;
+        const bounds = state.view.bounds;
+        const rangeX = Math.max(1, bounds.maxX - bounds.minX);
+        const rangeZ = Math.max(1, bounds.maxZ - bounds.minZ);
+        const scale = Math.min(
+          (width - paddingX * 2) / rangeX,
+          (height - paddingTop - paddingBottom) / rangeZ
+        );
+        const centerX = (bounds.minX + bounds.maxX) / 2;
+        const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+        const mapX = (x) => width / 2 + (x - centerX) * scale;
+        const mapY = (z) => paddingTop + (height - paddingTop - paddingBottom) / 2 + (z - centerZ) * scale;
+
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = 'rgba(5, 10, 16, .94)';
+        context.fillRect(0, 0, width, height);
+        context.fillStyle = '#8d99a8';
+        context.font = '700 8px ui-monospace, SFMono-Regular, Menlo, monospace';
+        context.letterSpacing = '0.08em';
+        context.fillText(`VISÃO GERAL · C${state.cameraTargetRunnerId}`, 12, 15);
+
+        context.beginPath();
+        state.view.pathSamples.forEach((sample, index) => {
+          const x = mapX(sample.x);
+          const y = mapY(sample.z);
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        });
+        context.closePath();
+        context.lineJoin = 'round';
+        context.lineCap = 'round';
+        context.strokeStyle = '#edf1f5';
+        context.lineWidth = Math.max(5, state.view.trackWidth * scale * 0.82);
+        context.stroke();
+        context.strokeStyle = '#3b4652';
+        context.lineWidth = Math.max(3, state.view.trackWidth * scale * 0.52);
+        context.stroke();
+
+        state.race.runners.forEach((runner) => {
+          const lateralOffset = CAR_RACING_LINES[runner.id - 1] * 0.7;
+          const pose = getPositionAtDistance(runner.distance, lateralOffset);
+          const selected = runner.id === state.cameraTargetRunnerId;
+          context.beginPath();
+          context.arc(mapX(pose.x), mapY(pose.z), selected ? 5.2 : 3.8, 0, Math.PI * 2);
+          context.fillStyle = runner.color;
+          context.fill();
+          context.lineWidth = selected ? 2 : 1;
+          context.strokeStyle = selected ? '#ffffff' : 'rgba(255, 255, 255, .45)';
+          context.stroke();
+        });
+      }
+
+      function drawRace(deltaTime = 1 / 60) {
         if (!renderer || !scene || !camera || !state.race) return;
         const ranks = getRanks();
         state.race.runners.forEach((runner) => {
@@ -2896,12 +3059,15 @@
           object.group.position.set(pose.x, 0.08, pose.z);
           object.group.rotation.y = -pose.angle;
           object.group.rotation.x = -pose.turnSign * pose.cornerSeverity * 0.1;
+          object.pose = pose;
           const pulse = runner.sprintTimer > 0 ? 1.08 : 1;
           object.group.scale.setScalar(pulse);
           updateTrail(runner, pose);
           object.group.renderOrder = ranks.get(runner.id);
         });
+        updateFollowCamera(deltaTime);
         renderer.render(scene, camera);
+        drawMinimap();
       }
 
       function handleCountdown(now) {
@@ -2919,6 +3085,10 @@
       }
 
       function animationLoop(now) {
+        const previousCameraFrame = state.lastCameraFrame ?? now;
+        const visualDelta = Math.min(0.08, Math.max(0, (now - previousCameraFrame) / 1000));
+        state.lastCameraFrame = now;
+
         if (state.phase === 'countdown') {
           handleCountdown(now);
         } else if (state.phase === 'racing') {
@@ -2930,7 +3100,7 @@
           state.lastFrame = now;
         }
 
-        drawRace();
+        drawRace(visualDelta);
 
         if (now - state.lastUiUpdate > 80) {
           if (state.phase === 'racing' || state.phase === 'finished') {
@@ -2955,12 +3125,26 @@
         elements.clearSessionButton.addEventListener('click', clearSession);
         elements.reviewResultButton.addEventListener('click', () => closeResultOverlay(true));
         elements.newRaceButton.addEventListener('click', prepareNewRound);
+        elements.race3dHud.querySelectorAll('[data-runner-id]').forEach((card) => {
+          const runnerId = Number(card.dataset.runnerId);
+          card.addEventListener('click', () => selectCameraTarget(runnerId));
+          card.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            selectCameraTarget(runnerId);
+          });
+        });
         elements.resultOverlay.addEventListener('click', (event) => {
           if (event.target === elements.resultOverlay) {
             closeResultOverlay(true);
           }
         });
         document.addEventListener('keydown', (event) => {
+          const activeElement = document.activeElement;
+          const isEditing = activeElement instanceof HTMLElement && activeElement.matches('input, select, textarea');
+          if (!isEditing && /^[1-4]$/.test(event.key)) {
+            selectCameraTarget(Number(event.key));
+          }
           if (event.key === 'Escape' && !elements.resultOverlay.hidden) {
             closeResultOverlay(true);
           }
@@ -2980,8 +3164,10 @@
         document.addEventListener('visibilitychange', () => {
           if (document.hidden) {
             state.lastFrame = null;
+            state.lastCameraFrame = null;
           } else if (state.phase === 'racing') {
             state.lastFrame = performance.now();
+            state.lastCameraFrame = performance.now();
           }
         });
       }
