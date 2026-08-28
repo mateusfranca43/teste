@@ -2397,17 +2397,32 @@
         drawRace(1 / 60);
       }
 
-      // Circuito amplo: os setores ocupam o perímetro e mantêm grande distância
-      // entre trechos não adjacentes, evitando sobreposição da pista e dos muros.
+      // Interlagos estilizado: setores amplos preservam o caráter do circuito
+      // brasileiro sem reproduzir coordenadas reais ou comprometer as barreiras.
       const CIRCUIT_SEGMENTS = [
-        { from: [.13, .80], c1: [.30, .80], c2: [.52, .80], to: [.68, .80] },
-        { c1: [.80, .80], c2: [.90, .73], to: [.88, .62] },
-        { c1: [.89, .50], c2: [.88, .36], to: [.82, .28] },
-        { c1: [.76, .19], c2: [.67, .15], to: [.58, .16] },
-        { c1: [.47, .15], c2: [.35, .16], to: [.26, .18] },
-        { c1: [.15, .20], c2: [.08, .30], to: [.08, .42] },
-        { c1: [.08, .49], c2: [.10, .57], to: [.12, .60] },
-        { c1: [.16, .66], c2: [.16, .75], to: [.13, .80] }
+        // Reta principal / largada e chegada.
+        { from: [.76, 1.03], c1: [.707, 1.045], c2: [.170, 1.052], to: [.12, 1.03] },
+        // S do Senna: duas curvas rápidas em direções opostas.
+        { c1: [.070, 1.008], c2: [.034, .752], to: [.04, .72] },
+        { c1: [.046, .688], c2: [.191, .601], to: [.20, .57] },
+        // Curva de média que prepara a Reta Oposta.
+        { c1: [.209, .539], c2: [.131, .311], to: [.17, .28] },
+        // Reta Oposta longa e levemente diagonal.
+        { c1: [.209, .249], c2: [.706, .117], to: [.76, .12] },
+        // Descida do Lago: contorno externo amplo e progressivo.
+        { c1: [.814, .123], c2: [.934, .291], to: [.94, .32] },
+        { c1: [.946, .349], c2: [.860, .522], to: [.84, .53] },
+        // Ferradura: o ponto mais apertado e lento da volta.
+        { c1: [.820, .538], c2: [.671, .422], to: [.66, .43] },
+        { c1: [.649, .438], c2: [.694, .634], to: [.68, .65] },
+        // Laranja, Pinheirinho e Bico de Pato em sequência fluida.
+        { c1: [.666, .666], c2: [.489, .651], to: [.46, .66] },
+        { c1: [.431, .669], c2: [.269, .766], to: [.27, .78] },
+        { c1: [.271, .794], c2: [.450, .854], to: [.48, .86] },
+        { c1: [.510, .866], c2: [.672, .863], to: [.70, .86] },
+        { c1: [.728, .857], c2: [.876, .808], to: [.88, .82] },
+        // Curva do Sol: arco largo que devolve os carros à reta principal.
+        { c1: [.884, .832], c2: [.813, 1.015], to: [.76, 1.03] }
       ];
 
       function cubicPoint(p0, p1, p2, p3, t) {
