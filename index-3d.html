@@ -1163,9 +1163,11 @@
       const TOTAL_RACE_DISTANCE = LOGICAL_LAP_LENGTH * TOTAL_LAPS;
       const MAX_DRIFT_OFFSET = 0.38;
       const TRACK_WIDTH = 4.2;
-      const TRACK_BARRIER_WIDTH = 0.275;
-      const TRACK_CLEARANCE_MARGIN = 2.5;
-      const MIN_TRACK_CLEARANCE = TRACK_WIDTH + TRACK_BARRIER_WIDTH + TRACK_CLEARANCE_MARGIN;
+      const TRACK_CURB_WIDTH = 0.42;
+      const TRACK_RUNOFF_WIDTH = 0.9;
+      const TRACK_SURFACE_WIDTH = TRACK_WIDTH + 2 * (TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH);
+      const TRACK_CLEARANCE_MARGIN = 0.7;
+      const MIN_TRACK_CLEARANCE = TRACK_SURFACE_WIDTH + TRACK_CLEARANCE_MARGIN;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const TAB_ID = (() => {
         try {
@@ -2401,28 +2403,28 @@
       // brasileiro sem reproduzir coordenadas reais ou comprometer as barreiras.
       const CIRCUIT_SEGMENTS = [
         // Reta principal / largada e chegada.
-        { from: [.76, 1.03], c1: [.707, 1.045], c2: [.170, 1.052], to: [.12, 1.03] },
+        { from: [.76, 1.14905], c1: [.69347, 1.19519], c2: [.21342, 1.25659], to: [.12, 1.14905] },
         // S do Senna: duas curvas rápidas em direções opostas.
-        { c1: [.070, 1.008], c2: [.034, .752], to: [.04, .72] },
-        { c1: [.046, .688], c2: [.191, .601], to: [.20, .57] },
+        { c1: [.02658, 1.04150], c2: [.01274, .82670], to: [.04, .72] },
+        { c1: [.06726, .61330], c2: [.16858, .67401], to: [.20, .57] },
         // Curva de média que prepara a Reta Oposta.
-        { c1: [.209, .539], c2: [.131, .311], to: [.17, .28] },
+        { c1: [.23142, .46599], c2: [.12528, .37563], to: [.17, .28] },
         // Reta Oposta longa e levemente diagonal.
-        { c1: [.209, .249], c2: [.706, .117], to: [.76, .12] },
+        { c1: [.21472, .18437], c2: [.67318, .08945], to: [.76, .12] },
         // Descida do Lago: contorno externo amplo e progressivo.
-        { c1: [.814, .123], c2: [.934, .291], to: [.94, .32] },
-        { c1: [.946, .349], c2: [.860, .522], to: [.84, .53] },
+        { c1: [.84682, .15055], c2: [.92938, .21748], to: [.94, .32] },
+        { c1: [.95062, .42252], c2: [.90580, .50319], to: [.84, .53] },
         // Ferradura: o ponto mais apertado e lento da volta.
-        { c1: [.820, .538], c2: [.671, .422], to: [.66, .43] },
-        { c1: [.649, .438], c2: [.694, .634], to: [.68, .65] },
+        { c1: [.77420, .55681], c2: [.72381, .33803], to: [.65625, .40476] },
+        { c1: [.58869, .47150], c2: [.72046, .66252], to: [.65625, .73810] },
         // Laranja, Pinheirinho e Bico de Pato em sequência fluida.
-        { c1: [.666, .666], c2: [.489, .651], to: [.46, .66] },
-        { c1: [.431, .669], c2: [.269, .766], to: [.27, .78] },
-        { c1: [.271, .794], c2: [.450, .854], to: [.48, .86] },
-        { c1: [.510, .866], c2: [.672, .863], to: [.70, .86] },
-        { c1: [.728, .857], c2: [.876, .808], to: [.88, .82] },
+        { c1: [.59204, .81367], c2: [.54094, .65151], to: [.46, .66] },
+        { c1: [.37906, .66849], c2: [.27672, .65506], to: [.27, .78] },
+        { c1: [.26328, .90494], c2: [.39538, .94222], to: [.48, .97905] },
+        { c1: [.56462, 1.01588], c2: [.62743, .98707], to: [.70, .97905] },
+        { c1: [.77257, .97103], c2: [.84514, .84172], to: [.88, .93905] },
         // Curva do Sol: arco largo que devolve os carros à reta principal.
-        { c1: [.884, .832], c2: [.813, 1.015], to: [.76, 1.03] }
+        { c1: [.91486, 1.03637], c2: [.82653, 1.10290], to: [.76, 1.14905] }
       ];
 
       function cubicPoint(p0, p1, p2, p3, t) {
@@ -2493,10 +2495,8 @@
         );
       }
 
-      // Regra estrutural: compara todos os pequenos segmentos de reta gerados pela
-      // amostragem de Bézier. Apenas setores lógicos vizinhos são ignorados, pois
-      // compartilham a mesma curva. Qualquer outro trecho precisa respeitar toda a
-      // largura da pista, do muro e a margem de segurança definida acima.
+      // Regra estrutural: setores independentes precisam comportar asfalto, zebras,
+      // escape e margem de segurança sem que as respectivas superfícies se encontrem.
       function validateCircuitSpacing(samples, minimumClearance = MIN_TRACK_CLEARANCE) {
         const sampledSegments = samples.slice(0, -1).map((sample, index) => ({
           start: sample,
@@ -2531,6 +2531,67 @@
           valid: violations.length === 0,
           minimumClearance,
           closestDistance,
+          violations
+        };
+      }
+
+      // A distância entre linhas centrais não detecta uma dobra muito apertada na
+      // própria faixa. Esta segunda validação constrói as duas bordas reais do
+      // asfalto e procura interseções entre todos os trechos que não são vizinhos.
+      function validateRibbonTopology(samples, width = TRACK_WIDTH) {
+        const boundaries = samples.map((sample) => {
+          const normalX = -Math.sin(sample.angle);
+          const normalZ = Math.cos(sample.angle);
+          return {
+            left: {
+              x: sample.x + normalX * width / 2,
+              z: sample.z + normalZ * width / 2
+            },
+            right: {
+              x: sample.x - normalX * width / 2,
+              z: sample.z - normalZ * width / 2
+            }
+          };
+        });
+        const segmentCount = boundaries.length - 1;
+        const violations = [];
+        let intersectionCount = 0;
+
+        for (let firstIndex = 0; firstIndex < segmentCount; firstIndex += 1) {
+          for (let secondIndex = firstIndex + 1; secondIndex < segmentCount; secondIndex += 1) {
+            const rawGap = Math.abs(firstIndex - secondIndex);
+            const circularGap = Math.min(rawGap, segmentCount - rawGap);
+            if (circularGap <= 2) continue;
+
+            const first = boundaries[firstIndex];
+            const firstNext = boundaries[firstIndex + 1];
+            const second = boundaries[secondIndex];
+            const secondNext = boundaries[secondIndex + 1];
+            const edgePairs = [
+              ['left', 'left'],
+              ['left', 'right'],
+              ['right', 'left'],
+              ['right', 'right']
+            ];
+
+            edgePairs.forEach(([firstEdge, secondEdge]) => {
+              if (!lineSegmentsIntersect(
+                first[firstEdge],
+                firstNext[firstEdge],
+                second[secondEdge],
+                secondNext[secondEdge]
+              )) return;
+              intersectionCount += 1;
+              if (violations.length < 12) {
+                violations.push({ firstIndex, secondIndex, firstEdge, secondEdge });
+              }
+            });
+          }
+        }
+
+        return {
+          valid: intersectionCount === 0,
+          intersectionCount,
           violations
         };
       }
@@ -2605,7 +2666,16 @@
           );
         }
 
-        return { samples, trackLength, apexes, bounds, spacingReport };
+        const topologyReport = validateRibbonTopology(samples);
+        if (!topologyReport.valid) {
+          const firstViolation = topologyReport.violations[0];
+          throw new Error(
+            `Malha inválida: as bordas do asfalto se cruzam entre as amostras ` +
+            `${firstViolation.firstIndex} e ${firstViolation.secondIndex}.`
+          );
+        }
+
+        return { samples, trackLength, apexes, bounds, spacingReport, topologyReport };
       }
 
       function getCircuitPositionAtViewDistance(distance, lateralOffset = 0) {
@@ -2667,102 +2737,54 @@
         return geometry;
       }
 
-      function createTrackBarrierGeometry(samples, offset, bottomY, topY, thickness) {
-        const positions = [];
-        const indices = [];
-
-        samples.forEach((sample) => {
-          const normalX = -Math.sin(sample.angle);
-          const normalZ = Math.cos(sample.angle);
-          const centerX = sample.x + normalX * offset;
-          const centerZ = sample.z + normalZ * offset;
-          const halfThickness = thickness / 2;
-
-          positions.push(
-            centerX - normalX * halfThickness, bottomY, centerZ - normalZ * halfThickness,
-            centerX + normalX * halfThickness, bottomY, centerZ + normalZ * halfThickness,
-            centerX - normalX * halfThickness, topY, centerZ - normalZ * halfThickness,
-            centerX + normalX * halfThickness, topY, centerZ + normalZ * halfThickness
-          );
-        });
-
-        for (let index = 0; index < samples.length - 1; index += 1) {
-          const base = index * 4;
-          const next = base + 4;
-          indices.push(
-            base, next, base + 2,
-            next, next + 2, base + 2,
-            base + 1, base + 3, next + 1,
-            next + 1, base + 3, next + 3,
-            base + 2, next + 2, base + 3,
-            next + 2, next + 3, base + 3
-          );
-        }
-
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setIndex(indices);
-        geometry.computeVertexNormals();
-        return geometry;
+      function createTrackRunoff() {
+        const runoff = new THREE.Mesh(
+          createRibbonGeometry(state.view.pathSamples, TRACK_SURFACE_WIDTH, 0.012),
+          new THREE.MeshStandardMaterial({
+            color: 0xd8bd7b,
+            roughness: 1,
+            metalness: 0,
+            flatShading: true,
+            side: THREE.DoubleSide
+          })
+        );
+        runoff.receiveShadow = true;
+        scene.add(runoff);
       }
 
-      function createTrackBarriers() {
-        const wallMaterial = new THREE.MeshStandardMaterial({
-          color: 0xf4f2e9,
-          roughness: 0.82,
-          metalness: 0.02,
-          flatShading: true,
-          side: THREE.DoubleSide
-        });
-        const stripeMaterial = new THREE.MeshStandardMaterial({
-          color: 0x1769c2,
-          roughness: 0.7,
-          metalness: 0.03,
-          flatShading: true,
-          side: THREE.DoubleSide
-        });
-        const sponsorMaterials = [
-          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.76, flatShading: true }),
-          new THREE.MeshStandardMaterial({ color: 0xffd44d, roughness: 0.76, flatShading: true })
+      function createTrackCurbs() {
+        const curbMaterials = [
+          new THREE.MeshStandardMaterial({ color: 0xf6f4ed, roughness: 0.9, flatShading: true }),
+          new THREE.MeshStandardMaterial({ color: 0xd9343a, roughness: 0.86, flatShading: true })
         ];
-        const wallOffset = state.view.trackWidth / 2 + 0.35;
+        const curbGeometry = new THREE.BoxGeometry(0.72, 0.045, TRACK_CURB_WIDTH);
+        const curbMatrices = [[], []];
+        const transform = new THREE.Object3D();
 
-        [-1, 1].forEach((edge) => {
-          const offset = edge * wallOffset;
-          const wall = new THREE.Mesh(
-            createTrackBarrierGeometry(state.view.pathSamples, offset, 0.03, 0.82, 0.24),
-            wallMaterial
-          );
-          wall.castShadow = true;
-          wall.receiveShadow = true;
-          scene.add(wall);
-
-          const stripe = new THREE.Mesh(
-            createTrackBarrierGeometry(state.view.pathSamples, offset, 0.34, 0.58, TRACK_BARRIER_WIDTH),
-            stripeMaterial
-          );
-          stripe.castShadow = true;
-          stripe.receiveShadow = true;
-          scene.add(stripe);
-
+        [-1, 1].forEach((edge, edgeIndex) => {
+          const lateralOffset = edge * (state.view.trackWidth / 2 + TRACK_CURB_WIDTH / 2);
           state.view.pathSamples.forEach((sample, index) => {
-            if (index % 28 !== 0) return;
+            if (index >= state.view.pathSamples.length - 1 || index % 3 !== 0) return;
             const normalX = -Math.sin(sample.angle);
             const normalZ = Math.cos(sample.angle);
-            const faceOffset = offset + edge * 0.15;
-            const sponsorBlock = new THREE.Mesh(
-              new THREE.BoxGeometry(0.7, 0.12, 0.045),
-              sponsorMaterials[Math.floor(index / 28) % sponsorMaterials.length]
+            const materialIndex = (Math.floor(index / 3) + edgeIndex) % curbMaterials.length;
+            transform.position.set(
+              sample.x + normalX * lateralOffset,
+              0.07,
+              sample.z + normalZ * lateralOffset
             );
-            sponsorBlock.position.set(
-              sample.x + normalX * faceOffset,
-              0.46,
-              sample.z + normalZ * faceOffset
-            );
-            sponsorBlock.rotation.y = -sample.angle;
-            sponsorBlock.castShadow = true;
-            scene.add(sponsorBlock);
+            transform.rotation.set(0, -sample.angle, 0);
+            transform.updateMatrix();
+            curbMatrices[materialIndex].push(transform.matrix.clone());
           });
+        });
+
+        curbMatrices.forEach((matrices, materialIndex) => {
+          const curbs = new THREE.InstancedMesh(curbGeometry, curbMaterials[materialIndex], matrices.length);
+          matrices.forEach((matrix, index) => curbs.setMatrixAt(index, matrix));
+          curbs.instanceMatrix.needsUpdate = true;
+          curbs.receiveShadow = true;
+          scene.add(curbs);
         });
       }
 
@@ -2813,21 +2835,79 @@
         scene.add(water);
       }
 
+      function createGrandstand(distance, lateralOffset, seatColors) {
+        const pose = getPositionAtDistance(distance, lateralOffset);
+        const side = Math.sign(lateralOffset) || 1;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+
+        const structureMaterial = new THREE.MeshStandardMaterial({
+          color: 0x69737d,
+          roughness: 0.9,
+          flatShading: true
+        });
+        const seatMaterials = seatColors.map((color) => new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.84,
+          flatShading: true
+        }));
+
+        for (let tier = 0; tier < 5; tier += 1) {
+          const step = new THREE.Mesh(
+            new THREE.BoxGeometry(5.2, 0.22, 0.74),
+            structureMaterial
+          );
+          step.position.set(0, 0.14 + tier * 0.24, side * tier * 0.47);
+          group.add(step);
+
+          const seats = new THREE.Mesh(
+            new THREE.BoxGeometry(4.9, 0.12, 0.5),
+            seatMaterials[tier % seatMaterials.length]
+          );
+          seats.position.set(0, 0.3 + tier * 0.24, side * tier * 0.47);
+          group.add(seats);
+        }
+
+        [-1.9, 1.9].forEach((x) => {
+          const support = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 1.25, 0.2),
+            structureMaterial
+          );
+          support.position.set(x, 0.62, side * 0.9);
+          group.add(support);
+        });
+
+        group.traverse((child) => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        scene.add(group);
+      }
+
       function createEnvironmentProps() {
-        createTireBarrier(LOGICAL_LAP_LENGTH * 0.25, state.view.trackWidth / 2 + 1.45, 0xe6425f);
-        createTireBarrier(LOGICAL_LAP_LENGTH * 0.72, -state.view.trackWidth / 2 - 1.45, 0xf7d14a);
+        const propOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 0.8;
+        const standOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 3.1;
+        createTireBarrier(LOGICAL_LAP_LENGTH * 0.25, propOffset, 0xe6425f);
+        createTireBarrier(LOGICAL_LAP_LENGTH * 0.72, -propOffset, 0xf7d14a);
+        createGrandstand(LOGICAL_LAP_LENGTH * 0.05, -standOffset, [0xe23f48, 0xf2f4f7, 0x2f78d0]);
+        createGrandstand(LOGICAL_LAP_LENGTH * 0.36, standOffset, [0x7748d5, 0xf4ca43, 0xf2f4f7]);
+        createGrandstand(LOGICAL_LAP_LENGTH * 0.56, -standOffset, [0x2f78d0, 0xf2f4f7, 0xe23f48]);
         createPond();
       }
 
       function createTrackScene() {
         const ground = new THREE.Mesh(
-          new THREE.PlaneGeometry(76, 54, 1, 1),
+          new THREE.PlaneGeometry(96, 76, 1, 1),
           new THREE.MeshStandardMaterial({ color: 0x7dbd5f, roughness: 1, metalness: 0, flatShading: true })
         );
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = -0.08;
         ground.receiveShadow = true;
         scene.add(ground);
+
+        createTrackRunoff();
 
         const track = new THREE.Mesh(
           createRibbonGeometry(state.view.pathSamples, state.view.trackWidth, 0.065),
@@ -2842,7 +2922,7 @@
         track.receiveShadow = true;
         scene.add(track);
 
-        createTrackBarriers();
+        createTrackCurbs();
 
         const finishPose = getPositionAtDistance(0);
         const checkerSize = state.view.trackWidth / 10;
