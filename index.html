@@ -756,7 +756,7 @@
       </div>
 
       <div class="race-shell">
-        <canvas id="raceCanvas" role="img" aria-label="Pista oval vista de cima com quatro carros futuristas em duas voltas"></canvas>
+        <canvas id="raceCanvas" role="img" aria-label="Circuito inspirado em Fórmula 1 visto de cima com quatro carros em duas voltas"></canvas>
         <div id="raceBanner" class="race-banner" aria-hidden="true">
           <strong id="raceBannerTitle">03</strong>
           <span id="raceBannerSubtitle">Sincronizando largada</span>
@@ -870,7 +870,7 @@
 
     <footer class="mt-6 flex flex-col gap-2 border-t border-white/[0.06] pt-4 text-[10px] leading-relaxed text-slate-700 sm:flex-row sm:items-center sm:justify-between">
       <p>RNG isolado das apostas · Física em passo fixo · Nenhum áudio</p>
-      <p class="metric-value uppercase tracking-[0.12em]">Neon Circuit / Build 02</p>
+      <p class="metric-value uppercase tracking-[0.12em]">Neon Circuit / Build 03</p>
     </footer>
   </main>
 
@@ -955,7 +955,7 @@
           color: '#2f8cff',
           rgb: '47, 140, 255',
           odds: 1.5,
-          baseSpeed: 108
+          baseSpeed: 110
         },
         {
           id: 2,
@@ -965,7 +965,7 @@
           color: '#3ee6a8',
           rgb: '62, 230, 168',
           odds: 7.0,
-          baseSpeed: 72
+          baseSpeed: 110
         },
         {
           id: 3,
@@ -975,7 +975,7 @@
           color: '#b45cff',
           rgb: '180, 92, 255',
           odds: 3.5,
-          baseSpeed: 132
+          baseSpeed: 110
         },
         {
           id: 4,
@@ -985,7 +985,7 @@
           color: '#ff7a1a',
           rgb: '255, 122, 26',
           odds: 2.5,
-          baseSpeed: 112
+          baseSpeed: 110
         }
       ];
 
@@ -1560,6 +1560,7 @@
       }
 
       function createRaceRunner(config, seed) {
+        const eventRng = mulberry32(hashString(`${seed}:${config.id}:event`));
         return {
           ...config,
           distance: 0,
@@ -1573,14 +1574,16 @@
           noise: 0,
           noiseTimer: 0,
           sprintTimer: 0,
-          sprintCooldown: config.id === 2 ? 0.75 : 0,
-          sprintSpeed: 300,
+          sprintCooldown: config.id === 2 ? 2.5 : 0,
+          sprintSpeed: config.baseSpeed * 0.95 * 1.4,
           stumbleTimer: 0,
           stumbleCooldown: 0,
           balancedTarget: config.baseSpeed,
           driftOffset: 0,
+          racingLineOffset: 0,
           previousPathAngle: null,
-          eventRng: mulberry32(hashString(`${seed}:${config.id}:event`)),
+          cornerGrip: config.id === 3 ? 0.78 + eventRng() * 0.44 : 1,
+          eventRng,
           noiseRng: mulberry32(hashString(`${seed}:${config.id}:noise`))
         };
       }
@@ -1661,77 +1664,54 @@
       function updateRunnerIntent(runner, dt) {
         runner.noiseTimer -= dt;
         runner.sprintCooldown = Math.max(0, runner.sprintCooldown - dt);
-        runner.stumbleCooldown = Math.max(0, runner.stumbleCooldown - dt);
 
         let target = runner.baseSpeed;
         let response = 3.8;
 
         if (runner.id === 1) {
-          if (runner.noiseTimer <= 0) {
-            runner.noise = (runner.noiseRng() - 0.5) * 4.8;
-            runner.noiseTimer += 0.35;
-          }
-          target = runner.baseSpeed + runner.noise + Math.sin(state.race.elapsedSim * 1.15) * 1.4;
-          response = 3.4;
+          // Conservador: referência pura, sem ruído ou eventos aleatórios.
+          target = runner.baseSpeed;
+          response = 3.2;
         }
 
         if (runner.id === 2) {
+          const slowBase = runner.baseSpeed * 0.95;
           if (runner.sprintTimer > 0) {
             runner.sprintTimer = Math.max(0, runner.sprintTimer - dt);
             target = runner.sprintSpeed;
-            response = 5.2;
-            if (runner.sprintTimer === 0) runner.sprintCooldown = 1.3 + runner.eventRng() * 0.45;
+            response = 3.1;
+            if (runner.sprintTimer === 0) runner.sprintCooldown = 5 + runner.eventRng() * 2;
           } else {
-            // 2% por frame a 60 fps, convertido em taxa por segundo para que
-            // a probabilidade seja idêntica em monitores de 60/120/144 Hz.
-            const sprintChance = 1 - Math.exp(-1.2122 * dt);
+            // 0,1% por frame a 60 fps convertido em taxa por segundo.
+            const sprintChance = 1 - Math.exp(-0.06003 * dt);
             if (runner.sprintCooldown <= 0 && runner.eventRng() < sprintChance) {
-              runner.sprintTimer = 0.5 + runner.eventRng() * 0.16;
-              runner.sprintSpeed = 280 + runner.eventRng() * 55;
+              runner.sprintTimer = 1.5;
+              runner.sprintSpeed = slowBase * 1.4;
               target = runner.sprintSpeed;
-              response = 5.2;
+              response = 3.1;
             } else {
-              if (runner.noiseTimer <= 0) {
-                runner.noise = (runner.noiseRng() - 0.5) * 14;
-                runner.noiseTimer += 0.28;
-              }
-              target = runner.baseSpeed + runner.noise;
-              response = 3.8;
+              target = slowBase;
+              response = 2.8;
             }
           }
         }
 
         if (runner.id === 3) {
-          // Equivalente a 5% a cada ciclo de 400 ms, sem depender do FPS.
-          const stumbleChance = 1 - Math.exp(-0.12823 * dt);
-          if (runner.stumbleTimer <= 0 && runner.stumbleCooldown <= 0 && runner.eventRng() < stumbleChance) {
-            runner.stumbleTimer = 1;
-            runner.stumbleCooldown = 1.2;
-          }
-
-          if (runner.stumbleTimer > 0) {
-            runner.stumbleTimer = Math.max(0, runner.stumbleTimer - dt);
-            target = 4;
-            response = 6.2;
-          } else {
-            if (runner.noiseTimer <= 0) {
-              runner.noise = (runner.noiseRng() - 0.5) * 40;
-              runner.noiseTimer += 0.2;
-            }
-            target = runner.baseSpeed + runner.noise;
-            response = 4.1;
-          }
+          // Caótico: +10% em retas, mas perde até 52% em curvas fechadas.
+          const pose = state.view.trackLength ? getPositionAtDistance(runner.distance) : { cornerSeverity: 0 };
+          const severity = pose.cornerSeverity || 0;
+          const tightness = clamp((severity - 0.52) / 0.48, 0, 1);
+          target = runner.baseSpeed * (1.1 - tightness * (0.33 / runner.cornerGrip));
+          response = tightness > 0.3 ? 4.8 : 3.5;
         }
 
         if (runner.id === 4) {
           if (runner.noiseTimer <= 0) {
-            const next = runner.baseSpeed + (runner.noiseRng() - 0.5) * 36;
-            runner.balancedTarget = clamp(0.72 * runner.balancedTarget + 0.28 * next, 94, 130);
-            runner.noiseTimer += 0.3;
+            runner.balancedTarget = runner.baseSpeed * (0.95 + runner.noiseRng() * 0.1);
+            runner.noiseTimer += 0.65 + runner.noiseRng() * 0.3;
           }
-          const wave = Math.sin(state.race.elapsedSim * 1.7 + 0.8) * 8;
-          target = clamp(runner.balancedTarget + wave, 90, 134);
-          response = 3.6;
+          target = clamp(runner.balancedTarget, runner.baseSpeed * 0.95, runner.baseSpeed * 1.05);
+          response = 2.6;
         }
 
         runner.targetSpeed = Math.max(0, target);
@@ -1767,7 +1747,8 @@
           if (runner.previousPathAngle !== null) {
             const angularDelta = normalizeAngle(pose.angle - runner.previousPathAngle);
             const turnRate = angularDelta / dt;
-            const desiredDrift = clamp(-turnRate * runner.velocity * 0.045, -MAX_DRIFT_OFFSET, MAX_DRIFT_OFFSET);
+            const driftStrength = 0.045 * (1 + pose.cornerSeverity * 1.65);
+            const desiredDrift = clamp(-turnRate * runner.velocity * driftStrength, -MAX_DRIFT_OFFSET, MAX_DRIFT_OFFSET);
             const driftBlend = 1 - Math.exp(-5.2 * dt);
             runner.driftOffset += (desiredDrift - runner.driftOffset) * driftBlend;
           }
@@ -2130,76 +2111,157 @@
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const width = Math.max(320, rect.width);
         const height = Math.max(380, rect.height);
-        const margin = width < 620 ? 34 : 52;
-        const radius = Math.min(height * 0.32, width * 0.23);
-        const leftCenterX = margin + radius;
-        const rightCenterX = width - margin - radius;
-        const straightLength = Math.max(48, rightCenterX - leftCenterX);
-        const trackLength = straightLength * 2 + Math.PI * radius * 2;
-        const trackWidth = clamp(radius * 0.48, 68, 118);
+        const trackWidth = clamp(Math.min(width, height) * 0.115, 54, 86);
         elements.canvas.width = Math.round(width * dpr);
         elements.canvas.height = Math.round(height * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const circuit = buildCircuitGeometry(width, height);
         state.view = {
           width,
           height,
           dpr,
           centerY: height / 2,
-          radius,
-          leftCenterX,
-          rightCenterX,
-          straightLength,
-          trackLength,
+          trackLength: circuit.trackLength,
           trackWidth,
-          laneSpacing: trackWidth / 5.2
+          laneSpacing: trackWidth / 5.3,
+          circuitPath: circuit.path,
+          pathSamples: circuit.samples,
+          apexes: circuit.apexes
         };
         drawRace();
       }
 
-      // Caminho paramétrico do oval. A distância é contínua e retorna também
-      // o ângulo tangente; nenhum carro interpola em linha reta entre waypoints.
-      function getOvalPositionAtViewDistance(distance, lateralOffset = 0) {
-        const { centerY, radius, leftCenterX, rightCenterX, straightLength, trackLength } = state.view;
-        let localDistance = ((distance % trackLength) + trackLength) % trackLength;
-        let x;
-        let y;
-        let angle;
-        let onCurve = false;
+      // Waypoints normalizados: reta longa, hairpin à direita, sequência de
+      // chicanes no miolo e hairpin de retorno. O Path2D usa bezierCurveTo.
+      const CIRCUIT_SEGMENTS = [
+        { from: [.12, .86], c1: [.32, .86], c2: [.60, .86], to: [.78, .86] },
+        { c1: [.96, .86], c2: [.97, .58], to: [.74, .58] },
+        { c1: [.64, .58], c2: [.57, .54], to: [.50, .52] },
+        { c1: [.44, .48], c2: [.41, .36], to: [.33, .42] },
+        { c1: [.25, .47], c2: [.27, .26], to: [.18, .31] },
+        { c1: [.14, .15], c2: [.39, .10], to: [.50, .17] },
+        { c1: [.60, .24], c2: [.59, .34], to: [.68, .28] },
+        { c1: [.77, .22], c2: [.88, .26], to: [.84, .39] },
+        { c1: [.88, .50], c2: [.75, .57], to: [.64, .57] },
+        { c1: [.55, .57], c2: [.47, .61], to: [.40, .64] },
+        { c1: [.18, .61], c2: [.02, .82], to: [.12, .86] }
+      ];
 
-        if (localDistance < straightLength) {
-          x = rightCenterX - localDistance;
-          y = centerY + radius;
-          angle = Math.PI;
-        } else if (localDistance < straightLength + Math.PI * radius) {
-          const arcDistance = localDistance - straightLength;
-          const theta = Math.PI / 2 + arcDistance / radius;
-          x = leftCenterX + Math.cos(theta) * radius;
-          y = centerY + Math.sin(theta) * radius;
-          angle = theta + Math.PI / 2;
-          onCurve = true;
-        } else if (localDistance < straightLength * 2 + Math.PI * radius) {
-          const topDistance = localDistance - straightLength - Math.PI * radius;
-          x = leftCenterX + topDistance;
-          y = centerY - radius;
-          angle = 0;
-        } else {
-          const arcDistance = localDistance - straightLength * 2 - Math.PI * radius;
-          const theta = Math.PI * 1.5 + arcDistance / radius;
-          x = rightCenterX + Math.cos(theta) * radius;
-          y = centerY + Math.sin(theta) * radius;
-          angle = theta + Math.PI / 2;
-          onCurve = true;
+      function cubicPoint(p0, p1, p2, p3, t) {
+        const inverse = 1 - t;
+        const inverse2 = inverse * inverse;
+        const t2 = t * t;
+        return {
+          x: inverse2 * inverse * p0.x + 3 * inverse2 * t * p1.x + 3 * inverse * t2 * p2.x + t2 * t * p3.x,
+          y: inverse2 * inverse * p0.y + 3 * inverse2 * t * p1.y + 3 * inverse * t2 * p2.y + t2 * t * p3.y
+        };
+      }
+
+      function cubicTangent(p0, p1, p2, p3, t) {
+        const inverse = 1 - t;
+        return {
+          x: 3 * inverse * inverse * (p1.x - p0.x) + 6 * inverse * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x),
+          y: 3 * inverse * inverse * (p1.y - p0.y) + 6 * inverse * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y)
+        };
+      }
+
+      function buildCircuitGeometry(width, height) {
+        const horizontalMargin = width < 620 ? 18 : 34;
+        const top = height * 0.13;
+        const bottom = height - 22;
+        const usableWidth = width - horizontalMargin * 2;
+        const usableHeight = bottom - top;
+        const mapPoint = ([x, y]) => ({
+          x: horizontalMargin + x * usableWidth,
+          y: top + y * usableHeight
+        });
+
+        const segments = [];
+        let current = mapPoint(CIRCUIT_SEGMENTS[0].from);
+        const path = new Path2D();
+        path.moveTo(current.x, current.y);
+        CIRCUIT_SEGMENTS.forEach((segment) => {
+          const c1 = mapPoint(segment.c1);
+          const c2 = mapPoint(segment.c2);
+          const to = mapPoint(segment.to);
+          segments.push({ from: current, c1, c2, to });
+          path.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, to.x, to.y);
+          current = to;
+        });
+        path.closePath();
+
+        const samples = [];
+        let trackLength = 0;
+        let previous = null;
+        segments.forEach((segment, segmentIndex) => {
+          for (let step = segmentIndex === 0 ? 0 : 1; step <= 36; step += 1) {
+            const t = step / 36;
+            const point = cubicPoint(segment.from, segment.c1, segment.c2, segment.to, t);
+            const tangent = cubicTangent(segment.from, segment.c1, segment.c2, segment.to, t);
+            if (previous) trackLength += Math.hypot(point.x - previous.x, point.y - previous.y);
+            const sample = {
+              ...point,
+              angle: Math.atan2(tangent.y, tangent.x),
+              distance: trackLength,
+              segmentIndex,
+              cornerSeverity: 0,
+              turnSign: 0
+            };
+            samples.push(sample);
+            previous = sample;
+          }
+        });
+
+        samples.forEach((sample, index) => {
+          const before = samples[Math.max(0, index - 3)];
+          const after = samples[Math.min(samples.length - 1, index + 3)];
+          const angularChange = normalizeAngle(after.angle - before.angle);
+          sample.cornerSeverity = clamp((Math.abs(angularChange) - 0.035) / 0.5, 0, 1);
+          sample.turnSign = Math.sign(angularChange);
+        });
+
+        const apexCandidates = [];
+        segments.forEach((segment, segmentIndex) => {
+          const candidates = samples.filter((sample) => sample.segmentIndex === segmentIndex);
+          const apex = candidates.reduce((best, sample) => (
+            sample.cornerSeverity > best.cornerSeverity ? sample : best
+          ), candidates[0]);
+          if (apex.cornerSeverity > 0.34) apexCandidates.push(apex);
+        });
+        const apexes = apexCandidates.filter((apex, index, list) => (
+          index === 0 || apex.distance - list[index - 1].distance > trackLength * 0.035
+        ));
+
+        return { path, samples, trackLength, apexes };
+      }
+
+      function getCircuitPositionAtViewDistance(distance, lateralOffset = 0) {
+        const { pathSamples, trackLength } = state.view;
+        const localDistance = ((distance % trackLength) + trackLength) % trackLength;
+        let low = 0;
+        let high = pathSamples.length - 1;
+        while (low < high) {
+          const middle = Math.floor((low + high) / 2);
+          if (pathSamples[middle].distance < localDistance) low = middle + 1;
+          else high = middle;
         }
-
+        const after = pathSamples[low];
+        const before = pathSamples[Math.max(0, low - 1)];
+        const span = Math.max(0.0001, after.distance - before.distance);
+        const ratio = clamp((localDistance - before.distance) / span, 0, 1);
+        const angle = before.angle + normalizeAngle(after.angle - before.angle) * ratio;
         const normalX = -Math.sin(angle);
         const normalY = Math.cos(angle);
+        const x = lerp(before.x, after.x, ratio);
+        const y = lerp(before.y, after.y, ratio);
         return {
           x: x + normalX * lateralOffset,
           y: y + normalY * lateralOffset,
           angle,
           normalX,
           normalY,
-          onCurve
+          cornerSeverity: lerp(before.cornerSeverity, after.cornerSeverity, ratio),
+          turnSign: Math.abs(ratio - 1) < 0.5 ? after.turnSign : before.turnSign
         };
       }
 
@@ -2207,24 +2269,25 @@
       // 1000 unidades, independentemente do tamanho do Canvas ou do devicePixelRatio.
       function getPositionAtDistance(distance, lateralOffset = 0) {
         const viewDistance = distance / LOGICAL_LAP_LENGTH * state.view.trackLength;
-        return getOvalPositionAtViewDistance(viewDistance, lateralOffset);
+        return getCircuitPositionAtViewDistance(viewDistance, lateralOffset);
       }
 
-      function buildStadiumPath(lateralOffset = 0) {
-        const { centerY, radius, leftCenterX, rightCenterX } = state.view;
-        const offsetRadius = Math.max(8, radius - lateralOffset);
+      function buildSampledCircuitPath(lateralOffset = 0) {
         const path = new Path2D();
-        path.moveTo(rightCenterX, centerY + offsetRadius);
-        path.lineTo(leftCenterX, centerY + offsetRadius);
-        path.arc(leftCenterX, centerY, offsetRadius, Math.PI / 2, Math.PI * 1.5);
-        path.lineTo(rightCenterX, centerY - offsetRadius);
-        path.arc(rightCenterX, centerY, offsetRadius, Math.PI * 1.5, Math.PI * 2.5);
+        state.view.pathSamples.forEach((sample, index) => {
+          const normalX = -Math.sin(sample.angle);
+          const normalY = Math.cos(sample.angle);
+          const x = sample.x + normalX * lateralOffset;
+          const y = sample.y + normalY * lateralOffset;
+          if (index === 0) path.moveTo(x, y);
+          else path.lineTo(x, y);
+        });
         path.closePath();
         return path;
       }
 
       function drawTrack() {
-        const { width, height, centerY, rightCenterX, trackLength, trackWidth, laneSpacing } = state.view;
+        const { width, height, centerY, trackWidth, circuitPath, apexes } = state.view;
         ctx.fillStyle = '#080c11';
         ctx.fillRect(0, 0, width, height);
 
@@ -2251,44 +2314,39 @@
           ctx.stroke();
         }
 
-        const centerPath = buildStadiumPath(0);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = 'rgba(0, 0, 0, .72)';
         ctx.lineWidth = trackWidth + 14;
-        ctx.stroke(centerPath);
+        ctx.stroke(circuitPath);
         ctx.strokeStyle = '#151b22';
         ctx.lineWidth = trackWidth;
-        ctx.stroke(centerPath);
+        ctx.stroke(circuitPath);
         ctx.strokeStyle = 'rgba(255,255,255,.026)';
         ctx.lineWidth = trackWidth - 10;
-        ctx.stroke(centerPath);
+        ctx.stroke(circuitPath);
 
-        [-laneSpacing, 0, laneSpacing].forEach((offset) => {
-          ctx.strokeStyle = 'rgba(255,255,255,.12)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([7, 11]);
-          ctx.stroke(buildStadiumPath(offset));
+        [-trackWidth / 2 + 4, trackWidth / 2 - 4].forEach((offset) => {
+          ctx.strokeStyle = 'rgba(255,255,255,.18)';
+          ctx.lineWidth = 1.2;
+          ctx.stroke(buildSampledCircuitPath(offset));
         });
-        ctx.setLineDash([]);
 
-        const curbStep = 15;
-        for (let distance = 0; distance < trackLength; distance += curbStep) {
-          const center = getOvalPositionAtViewDistance(distance);
-          if (!center.onCurve) continue;
-          const curbColor = Math.floor(distance / curbStep) % 2 === 0 ? '#f5f7fa' : '#e33d50';
-          [-trackWidth / 2, trackWidth / 2].forEach((offset) => {
-            const curb = getOvalPositionAtViewDistance(distance, offset);
+        // Zebras somente nos ápices detectados pelas maiores curvaturas.
+        apexes.forEach((apex) => {
+          const logicalApex = apex.distance / state.view.trackLength * LOGICAL_LAP_LENGTH;
+          for (let stripe = -2; stripe <= 2; stripe += 1) {
+            const curb = getPositionAtDistance(logicalApex + stripe * 8, apex.turnSign * trackWidth / 2);
             ctx.save();
             ctx.translate(curb.x, curb.y);
             ctx.rotate(curb.angle);
-            ctx.fillStyle = curbColor;
-            ctx.fillRect(-curbStep * .55, -3.5, curbStep * 1.1, 7);
+            ctx.fillStyle = stripe % 2 === 0 ? '#f5f7fa' : '#e33d50';
+            ctx.fillRect(-5.5, -3.5, 11, 7);
             ctx.restore();
-          });
-        }
+          }
+        });
 
-        const finish = getOvalPositionAtViewDistance(0);
+        const finish = getPositionAtDistance(0);
         const checkerSize = 6;
         const checkerCount = Math.ceil(trackWidth / checkerSize);
         ctx.save();
@@ -2329,8 +2387,8 @@
 
       function drawCar(runner, pose) {
         const compact = state.view.width < 540;
-        const width = compact ? 22 : 29;
-        const height = compact ? 11 : 14;
+        const length = compact ? 24 : 31;
+        const carWidth = compact ? 11 : 14;
         const flash = runner.stumbleTimer > 0
           ? (reducedMotion ? 0.62 : 0.38 + 0.62 * Math.abs(Math.sin(state.race.elapsedSim * Math.PI * 1.35)))
           : 1;
@@ -2343,28 +2401,53 @@
         ctx.fillStyle = `rgba(${runner.rgb}, .2)`;
         ctx.shadowColor = runner.color;
         ctx.shadowBlur = runner.sprintTimer > 0 ? 30 : 19;
-        ctx.fillRect(-width / 2 - 2, -height / 2 - 2, width + 4, height + 4);
+        ctx.fillRect(-length / 2 - 2, -carWidth / 2 - 2, length + 4, carWidth + 4);
         ctx.restore();
 
         ctx.save();
         ctx.translate(pose.x, pose.y);
         ctx.rotate(pose.angle);
         ctx.globalAlpha = flash;
-        const shell = ctx.createLinearGradient(-width / 2, 0, width / 2, 0);
+        const shell = ctx.createLinearGradient(-length / 2, 0, length / 2, 0);
         shell.addColorStop(0, `rgba(${runner.rgb}, .5)`);
         shell.addColorStop(.5, runner.color);
         shell.addColorStop(1, 'rgba(255,255,255,.88)');
         ctx.fillStyle = shell;
         ctx.strokeStyle = 'rgba(255,255,255,.56)';
         ctx.lineWidth = .7;
+
+        // Silhueta F1 top-down: asas largas, sidepods e monocoque estreito.
+        ctx.fillRect(length * .34, -carWidth * .72, length * .12, carWidth * 1.44);
+        ctx.fillRect(-length * .49, -carWidth * .62, length * .13, carWidth * 1.24);
         ctx.beginPath();
-        ctx.roundRect(-width / 2, -height / 2, width, height, 3);
+        ctx.moveTo(length * .48, 0);
+        ctx.lineTo(length * .22, -carWidth * .22);
+        ctx.lineTo(length * .04, -carWidth * .38);
+        ctx.lineTo(-length * .31, -carWidth * .32);
+        ctx.lineTo(-length * .43, -carWidth * .2);
+        ctx.lineTo(-length * .43, carWidth * .2);
+        ctx.lineTo(-length * .31, carWidth * .32);
+        ctx.lineTo(length * .04, carWidth * .38);
+        ctx.lineTo(length * .22, carWidth * .22);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
+
+        ctx.fillStyle = `rgba(${runner.rgb}, .72)`;
+        ctx.fillRect(-length * .18, -carWidth * .48, length * .23, carWidth * .96);
         ctx.fillStyle = 'rgba(4,8,13,.82)';
-        ctx.fillRect(-width * .1, -height * .34, width * .28, height * .68);
+        ctx.beginPath();
+        ctx.ellipse(-length * .02, 0, length * .105, carWidth * .25, 0, 0, Math.PI * 2);
+        ctx.fill();
         ctx.fillStyle = 'rgba(245,247,250,.92)';
-        ctx.fillRect(width * .25, -height * .24, width * .12, height * .48);
+        ctx.fillRect(length * .18, -carWidth * .09, length * .18, carWidth * .18);
+
+        ctx.fillStyle = 'rgba(2,5,9,.94)';
+        const wheelLength = length * .18;
+        const wheelWidth = carWidth * .2;
+        [[-.27, -.52], [-.27, .52], [.19, -.52], [.19, .52]].forEach(([x, y]) => {
+          ctx.fillRect(length * x - wheelLength / 2, carWidth * y - wheelWidth / 2, wheelLength, wheelWidth);
+        });
         ctx.restore();
       }
 
@@ -2374,7 +2457,7 @@
       }
 
       function drawRaceTelemetry(ranks) {
-        const { width, centerY } = state.view;
+        const { width, height } = state.view;
         const compact = width < 620;
         const gap = compact ? 4 : 8;
         const margin = compact ? 7 : 14;
@@ -2410,10 +2493,11 @@
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,255,255,.2)';
         ctx.font = `800 ${compact ? 8 : 10}px ui-monospace, monospace`;
-        ctx.fillText('CONTROLE DE VOLTA', width / 2, centerY - 11);
+        const lapDisplayY = height * .7;
+        ctx.fillText('CONTROLE DE VOLTA', width / 2, lapDisplayY - 11);
         ctx.fillStyle = 'rgba(245,247,250,.9)';
         ctx.font = `900 ${compact ? 16 : 22}px ui-monospace, monospace`;
-        ctx.fillText(`${getRunnerLap(leader)} / ${TOTAL_LAPS}`, width / 2, centerY + 12);
+        ctx.fillText(`${getRunnerLap(leader)} / ${TOTAL_LAPS}`, width / 2, lapDisplayY + 12);
         ctx.restore();
       }
 
@@ -2424,7 +2508,15 @@
         const runnersByDepth = [...state.race.runners].sort((a, b) => ranks.get(b.id) - ranks.get(a.id));
         runnersByDepth.forEach((runner) => {
           const distance = runner.distance;
-          const laneOffset = (runner.id - 2.5) * state.view.laneSpacing + runner.driftOffset;
+          const centerPose = getPositionAtDistance(distance);
+          const baseLine = (runner.id - 2.5) * state.view.laneSpacing * .72;
+          const lineBias = [-1, .65, -.55, 1][runner.id - 1] * state.view.laneSpacing * .32;
+          const dynamicLine = lineBias * centerPose.cornerSeverity * (centerPose.turnSign || 1);
+          const laneOffset = clamp(
+            baseLine + dynamicLine + runner.driftOffset,
+            -state.view.trackWidth / 2 + 8,
+            state.view.trackWidth / 2 - 8
+          );
           const pose = getPositionAtDistance(distance, laneOffset);
           drawTrail(runner, distance, laneOffset);
           drawCar(runner, pose);
