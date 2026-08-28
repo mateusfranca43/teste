@@ -2255,8 +2255,8 @@
           dpr,
           centerY: height / 2,
           trackLength: circuit.trackLength,
-          trackWidth: 2.75,
-          laneSpacing: 0.48,
+          trackWidth: 4.2,
+          laneSpacing: 0.9,
           pathSamples: circuit.samples,
           apexes: circuit.apexes
         };
@@ -2267,11 +2267,11 @@
         renderer.setPixelRatio(dpr);
         renderer.setSize(width, height, false);
         const aspect = width / height;
-        const verticalSize = aspect < 1.15 ? 34 : 23;
-        camera.left = -verticalSize * aspect / 2;
-        camera.right = verticalSize * aspect / 2;
-        camera.top = verticalSize / 2;
-        camera.bottom = -verticalSize / 2;
+        camera.aspect = aspect;
+        camera.fov = aspect < 1.15 ? 50 : 40;
+        const cameraDistance = aspect < 1.15 ? 31 : 26;
+        camera.position.set(0, cameraDistance, cameraDistance);
+        camera.lookAt(0, 0.25, 0);
         camera.updateProjectionMatrix();
         drawRace();
       }
@@ -2403,15 +2403,15 @@
         return getCircuitPositionAtViewDistance(viewDistance, lateralOffset);
       }
 
-      function createRibbonGeometry(samples, width) {
+      function createRibbonGeometry(samples, width, elevation = 0.055) {
         const positions = [];
         const indices = [];
         samples.forEach((sample) => {
           const normalX = -Math.sin(sample.angle);
           const normalZ = Math.cos(sample.angle);
           positions.push(
-            sample.x + normalX * width / 2, 0.035, sample.z + normalZ * width / 2,
-            sample.x - normalX * width / 2, 0.035, sample.z - normalZ * width / 2
+            sample.x + normalX * width / 2, elevation, sample.z + normalZ * width / 2,
+            sample.x - normalX * width / 2, elevation, sample.z - normalZ * width / 2
           );
         });
         for (let index = 0; index < samples.length - 1; index += 1) {
@@ -2439,40 +2439,57 @@
 
       function createTrackScene() {
         const ground = new THREE.Mesh(
-          new THREE.PlaneGeometry(38, 27),
-          new THREE.MeshStandardMaterial({ color: 0x0b1218, roughness: 1, metalness: 0 })
+          new THREE.PlaneGeometry(42, 30, 1, 1),
+          new THREE.MeshStandardMaterial({ color: 0x0a1117, roughness: 0.98, metalness: 0.01 })
         );
         ground.rotation.x = -Math.PI / 2;
-        ground.position.y = -0.03;
+        ground.position.y = -0.08;
+        ground.receiveShadow = true;
         scene.add(ground);
 
-        const grid = new THREE.GridHelper(38, 38, 0x263443, 0x17212b);
-        grid.position.y = 0;
+        const grid = new THREE.GridHelper(42, 42, 0x263443, 0x17212b);
+        grid.position.y = -0.065;
         grid.material.transparent = true;
-        grid.material.opacity = 0.3;
+        grid.material.opacity = 0.12;
         scene.add(grid);
 
-        const track = new THREE.Mesh(
-          createRibbonGeometry(state.view.pathSamples, state.view.trackWidth),
-          new THREE.MeshStandardMaterial({ color: 0x222b35, roughness: 0.94, metalness: 0.04, flatShading: true })
+        const shoulder = new THREE.Mesh(
+          createRibbonGeometry(state.view.pathSamples, state.view.trackWidth + 0.5, 0.025),
+          new THREE.MeshStandardMaterial({ color: 0x070b10, roughness: 1, metalness: 0 })
         );
+        shoulder.receiveShadow = true;
+        scene.add(shoulder);
+
+        const track = new THREE.Mesh(
+          createRibbonGeometry(state.view.pathSamples, state.view.trackWidth, 0.065),
+          new THREE.MeshStandardMaterial({ color: 0x252d36, roughness: 0.88, metalness: 0.06, flatShading: true })
+        );
+        track.receiveShadow = true;
         scene.add(track);
-        scene.add(createOffsetLine(state.view.trackWidth / 2 - 0.08, 0xcad3dd, 0.5));
-        scene.add(createOffsetLine(-state.view.trackWidth / 2 + 0.08, 0xcad3dd, 0.5));
+        scene.add(createOffsetLine(state.view.trackWidth / 2 - 0.1, 0xd8e0e8, 0.62));
+        scene.add(createOffsetLine(-state.view.trackWidth / 2 + 0.1, 0xd8e0e8, 0.62));
 
         const curbMaterials = [
           new THREE.MeshStandardMaterial({ color: 0xf3f6f8, roughness: 0.8, flatShading: true }),
           new THREE.MeshStandardMaterial({ color: 0xe13b4e, roughness: 0.8, flatShading: true })
         ];
-        state.view.apexes.forEach((apex) => {
-          const logicalApex = apex.distance / state.view.trackLength * LOGICAL_LAP_LENGTH;
-          for (let stripe = -2; stripe <= 2; stripe += 1) {
-            const pose = getPositionAtDistance(logicalApex + stripe * 8, apex.turnSign * state.view.trackWidth / 2);
-            const curb = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.08, 0.24), curbMaterials[Math.abs(stripe) % 2]);
-            curb.position.set(pose.x, 0.08, pose.z);
+        // Blocos sólidos alternados nas bordas das curvas: largura e volume
+        // continuam visíveis mesmo com a câmera em perspectiva.
+        state.view.pathSamples.forEach((sample, index) => {
+          if (index % 7 !== 0 || sample.cornerSeverity < 0.16) return;
+          const logicalDistance = sample.distance / state.view.trackLength * LOGICAL_LAP_LENGTH;
+          [-1, 1].forEach((edge) => {
+            const pose = getPositionAtDistance(logicalDistance, edge * state.view.trackWidth / 2);
+            const curb = new THREE.Mesh(
+              new THREE.BoxGeometry(0.55, 0.13, 0.34),
+              curbMaterials[Math.floor(index / 7) % 2]
+            );
+            curb.position.set(pose.x, 0.115, pose.z);
             curb.rotation.y = -pose.angle;
+            curb.castShadow = true;
+            curb.receiveShadow = true;
             scene.add(curb);
-          }
+          });
         });
 
         const finishPose = getPositionAtDistance(0);
@@ -2492,6 +2509,7 @@
               finishPose.z + Math.sin(finishPose.angle) * forward + finishPose.normalZ * lateral
             );
             tile.rotation.y = -finishPose.angle;
+            tile.receiveShadow = true;
             scene.add(tile);
           }
         }
@@ -2504,36 +2522,42 @@
         const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x070a0e, roughness: 0.82, flatShading: true });
         const highlightMaterial = new THREE.MeshStandardMaterial({ color: 0xeef5fb, roughness: 0.45, flatShading: true });
 
-        const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.28, 0.34), bodyMaterial);
-        chassis.position.y = 0.25;
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.4, 0.42), bodyMaterial);
+        chassis.position.y = 0.34;
         group.add(chassis);
 
-        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.15, 0.18), bodyMaterial);
-        nose.position.set(0.65, 0.22, 0);
+        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.2, 0.2), bodyMaterial);
+        nose.position.set(0.69, 0.3, 0);
         group.add(nose);
 
-        const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.92), bodyMaterial);
-        frontWing.position.set(0.96, 0.17, 0);
+        const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.98), bodyMaterial);
+        frontWing.position.set(1.01, 0.22, 0);
         group.add(frontWing);
 
-        const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.24, 0.74), bodyMaterial);
-        rearWing.position.set(-0.63, 0.33, 0);
+        const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.32, 0.8), bodyMaterial);
+        rearWing.position.set(-0.68, 0.43, 0);
         group.add(rearWing);
+
+        [-1, 1].forEach((side) => {
+          const sidepod = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.3, 0.24), bodyMaterial);
+          sidepod.position.set(-0.08, 0.31, side * 0.31);
+          group.add(sidepod);
+        });
 
         const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 5), darkMaterial);
         cockpit.scale.set(1.2, 0.75, 0.9);
-        cockpit.position.set(-0.05, 0.43, 0);
+        cockpit.position.set(-0.08, 0.57, 0);
         group.add(cockpit);
 
         const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.02, 0.06), highlightMaterial);
-        stripe.position.set(0.58, 0.305, 0);
+        stripe.position.set(0.6, 0.51, 0);
         group.add(stripe);
 
-        const wheelGeometry = new THREE.CylinderGeometry(0.16, 0.16, 0.16, 8);
-        [[-0.38, -0.34], [-0.38, 0.34], [0.42, -0.34], [0.42, 0.34]].forEach(([x, z]) => {
+        const wheelGeometry = new THREE.CylinderGeometry(0.19, 0.19, 0.22, 8);
+        [[-0.4, -0.4], [-0.4, 0.4], [0.45, -0.4], [0.45, 0.4]].forEach(([x, z]) => {
           const wheel = new THREE.Mesh(wheelGeometry, darkMaterial);
           wheel.rotation.x = Math.PI / 2;
-          wheel.position.set(x, 0.18, z);
+          wheel.position.set(x, 0.22, z);
           group.add(wheel);
         });
 
@@ -2545,6 +2569,11 @@
         glow.position.y = 0.055;
         glow.scale.set(1.8, 0.72, 1);
         group.add(glow);
+        group.traverse((child) => {
+          if (!child.isMesh || child === glow) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
         return group;
       }
 
@@ -2580,21 +2609,36 @@
           powerPreference: 'high-performance'
         });
         renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.08;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.setClearColor(0x080c11, 1);
 
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x080c11);
-        scene.fog = new THREE.Fog(0x080c11, 31, 52);
-        camera = new THREE.OrthographicCamera(-18, 18, 12, -12, 0.1, 100);
-        camera.position.set(0, 24, 20);
-        camera.lookAt(0, 0, 0);
+        scene.fog = new THREE.Fog(0x080c11, 44, 72);
+        camera = new THREE.PerspectiveCamera(40, 1, 0.1, 120);
+        camera.position.set(0, 26, 26);
+        camera.lookAt(0, 0.25, 0);
 
-        scene.add(new THREE.HemisphereLight(0xdcecff, 0x10151c, 2.35));
-        const keyLight = new THREE.DirectionalLight(0xffffff, 1.45);
-        keyLight.position.set(-8, 18, 11);
+        scene.add(new THREE.AmbientLight(0x9fb3c8, 0.62));
+        scene.add(new THREE.HemisphereLight(0xdcecff, 0x0c1218, 1.05));
+        const keyLight = new THREE.DirectionalLight(0xffffff, 2.25);
+        keyLight.position.set(-10, 24, 14);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.set(2048, 2048);
+        keyLight.shadow.camera.left = -22;
+        keyLight.shadow.camera.right = 22;
+        keyLight.shadow.camera.top = 18;
+        keyLight.shadow.camera.bottom = -18;
+        keyLight.shadow.camera.near = 1;
+        keyLight.shadow.camera.far = 70;
+        keyLight.shadow.bias = -0.00035;
+        keyLight.shadow.normalBias = 0.025;
         scene.add(keyLight);
-        const rimLight = new THREE.DirectionalLight(0x638dff, 0.65);
-        rimLight.position.set(14, 9, -10);
+        const rimLight = new THREE.PointLight(0x638dff, 18, 34, 2);
+        rimLight.position.set(12, 8, -9);
         scene.add(rimLight);
 
         createTrackScene();
@@ -2645,6 +2689,8 @@
         elements.lap3d.textContent = `${getRunnerLap(leader)} / ${TOTAL_LAPS}`;
       }
 
+      const CAR_RACING_LINES = [-1.5, -0.5, 0.5, 1.5];
+
       function drawRace() {
         if (!renderer || !scene || !camera || !state.race) return;
         const ranks = getRanks();
@@ -2652,13 +2698,13 @@
           const object = carObjects.get(runner.id);
           if (!object) return;
           const centerPose = getPositionAtDistance(runner.distance);
-          const baseLine = (runner.id - 2.5) * state.view.laneSpacing * 0.72;
-          const lineBias = [-1, 0.65, -0.55, 1][runner.id - 1] * state.view.laneSpacing * 0.32;
+          const baseLine = CAR_RACING_LINES[runner.id - 1];
+          const lineBias = [-1, 0.65, -0.55, 1][runner.id - 1] * 0.1;
           const dynamicLine = lineBias * centerPose.cornerSeverity * (centerPose.turnSign || 1);
           const laneOffset = clamp(
             baseLine + dynamicLine + runner.driftOffset,
-            -state.view.trackWidth / 2 + 0.38,
-            state.view.trackWidth / 2 - 0.38
+            -state.view.trackWidth / 2 + 0.55,
+            state.view.trackWidth / 2 - 0.55
           );
           const pose = getPositionAtDistance(runner.distance, laneOffset);
           object.group.position.set(pose.x, 0.08, pose.z);
