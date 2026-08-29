@@ -3118,17 +3118,26 @@
         });
       }
 
-      function createPitBuilding() {
-        // A área dos boxes fica no lado externo da reta e longe da linha de
-        // chegada, preservando também o enquadramento da câmera de celebração.
+      function finalizeEnvironmentGroup(group) {
+        group.traverse((child) => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        scene.add(group);
+      }
+
+      function createRaceControlTower() {
+        // A torre fica no lado externo e adiante da linha de chegada, longe do
+        // foco da câmera de celebração e integralmente depois da área de escape.
         const distance = LOGICAL_LAP_LENGTH * 0.085;
         const side = -1;
         const placement = findTrackSafePropPose(
           distance,
           side,
           7.2,
-          { length: 7.9, depth: 2.95 },
-          'prédio dos boxes'
+          { length: 7.6, depth: 3.1 },
+          'torre de controle'
         );
         if (!placement) return;
         const pose = placement.pose;
@@ -3136,34 +3145,43 @@
         group.position.set(pose.x, 0, pose.z);
         group.rotation.y = -pose.angle;
 
-        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xe9edf0, roughness: 0.84, flatShading: true });
-        const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x35404b, roughness: 0.88, flatShading: true });
-        const building = new THREE.Mesh(new THREE.BoxGeometry(7.4, 1.6, 2.65), wallMaterial);
-        building.position.y = 0.8;
-        group.add(building);
-        const roof = new THREE.Mesh(new THREE.BoxGeometry(7.9, 0.18, 2.95), darkMaterial);
-        roof.position.y = 1.69;
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xf0f3f5, roughness: 0.82, flatShading: true });
+        const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xaeb8c1, roughness: 0.86, flatShading: true });
+        const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x273442, roughness: 0.52, metalness: 0.12, flatShading: true });
+        const lowerBlock = new THREE.Mesh(new THREE.BoxGeometry(7.05, 1.45, 2.7), wallMaterial);
+        lowerBlock.position.y = 0.73;
+        group.add(lowerBlock);
+        const upperBox = new THREE.Mesh(new THREE.BoxGeometry(5.95, 1.35, 2.45), wallMaterial);
+        upperBox.position.set(0.2, 2.05, 0);
+        group.add(upperBox);
+
+        const windowBand = new THREE.Mesh(new THREE.BoxGeometry(5.45, 0.62, 0.09), windowMaterial);
+        windowBand.position.set(0.2, 2.15, -side * 1.25);
+        group.add(windowBand);
+        for (let mullion = 0; mullion < 7; mullion += 1) {
+          const divider = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.65, 0.11), trimMaterial);
+          divider.position.set(-2.36 + mullion * 0.79, 2.15, -side * 1.27);
+          group.add(divider);
+        }
+
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(6.55, 0.2, 2.95), wallMaterial);
+        roof.position.set(0.2, 2.82, 0);
+        roof.rotation.x = side * 0.11;
         group.add(roof);
 
         const garageColors = [0x2f8cff, 0x3ee6a8, 0xa970ff, 0xff8a3d];
-        for (let garage = 0; garage < 6; garage += 1) {
+        for (let garage = 0; garage < 5; garage += 1) {
           const door = new THREE.Mesh(
-            new THREE.BoxGeometry(0.92, 0.9, 0.08),
+            new THREE.BoxGeometry(1.05, 0.82, 0.08),
             new THREE.MeshStandardMaterial({ color: garageColors[garage % garageColors.length], roughness: 0.78, flatShading: true })
           );
-          door.position.set(-2.85 + garage * 1.14, 0.53, -side * 1.35);
+          door.position.set(-2.45 + garage * 1.23, 0.48, -side * 1.38);
           group.add(door);
         }
-        const fascia = new THREE.Mesh(new THREE.BoxGeometry(6.95, 0.22, 0.1), darkMaterial);
-        fascia.position.set(0, 1.28, -side * 1.37);
+        const fascia = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.2, 0.1), windowMaterial);
+        fascia.position.set(0, 1.22, -side * 1.4);
         group.add(fascia);
-
-        group.traverse((child) => {
-          if (!child.isMesh) return;
-          child.castShadow = true;
-          child.receiveShadow = true;
-        });
-        scene.add(group);
+        finalizeEnvironmentGroup(group);
       }
 
       function createFlagPole(distance, lateralOffset, color, flagDirection = 1) {
@@ -3198,6 +3216,151 @@
         scene.add(group);
       }
 
+      function createChainLinkFence(distance, side, length = 4.4) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          5.35,
+          { length: length + 0.3, depth: 0.28 },
+          'cerca metálica'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x7f8b93, roughness: 0.72, metalness: 0.18, flatShading: true });
+        [-length / 2, 0, length / 2].forEach((x) => {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 1.72, 7), frameMaterial);
+          post.position.set(x, 0.86, 0);
+          group.add(post);
+        });
+        [0.22, 1.5].forEach((y) => {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.055, 0.055), frameMaterial);
+          rail.position.set(0, y, 0);
+          group.add(rail);
+        });
+
+        const gridPositions = [];
+        for (let x = -length / 2 + 0.22; x < length / 2; x += 0.42) {
+          gridPositions.push(x, 0.24, 0, x, 1.48, 0);
+        }
+        for (let y = 0.32; y < 1.48; y += 0.28) {
+          gridPositions.push(-length / 2, y, 0, length / 2, y, 0);
+        }
+        const gridGeometry = new THREE.BufferGeometry();
+        gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridPositions, 3));
+        const grid = new THREE.LineSegments(
+          gridGeometry,
+          new THREE.LineBasicMaterial({ color: 0xaab4ba, transparent: true, opacity: 0.72 })
+        );
+        grid.position.z = 0.015;
+        group.add(grid);
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createTrackLight(distance, side) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          5.7,
+          { length: 0.72, depth: 0.72 },
+          'poste de iluminação'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x59656f, roughness: 0.76, metalness: 0.2, flatShading: true });
+        const lampMaterial = new THREE.MeshStandardMaterial({ color: 0xffedb0, emissive: 0xffd76a, emissiveIntensity: 0.35, roughness: 0.55, flatShading: true });
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.065, 3.75, 8), poleMaterial);
+        pole.position.y = 1.88;
+        group.add(pole);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.075, 0.075), poleMaterial);
+        arm.position.set(0.31, 3.67, 0);
+        group.add(arm);
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.24), lampMaterial);
+        lamp.position.set(0.62, 3.58, 0);
+        group.add(lamp);
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createDecorativeBarrier(distance, side, length = 3.3) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          5.65,
+          { length: length + 0.25, depth: 0.58 },
+          'barreira decorativa'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const colors = [0xe94f52, 0xf4f4ef];
+        const count = Math.max(4, Math.round(length / 0.52));
+        const pieceLength = length / count;
+        for (let index = 0; index < count; index += 1) {
+          const segment = new THREE.Mesh(
+            new THREE.BoxGeometry(pieceLength - 0.025, 0.42, 0.36),
+            new THREE.MeshStandardMaterial({ color: colors[index % colors.length], roughness: 0.82, flatShading: true })
+          );
+          segment.position.set(-length / 2 + pieceLength * (index + 0.5), 0.21, 0);
+          group.add(segment);
+        }
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createTimingTower(distance, side) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          7.25,
+          { length: 1.5, depth: 0.72 },
+          'torre de cronometragem'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const supportMaterial = new THREE.MeshStandardMaterial({ color: 0x65717a, roughness: 0.82, flatShading: true });
+        const screenMaterial = new THREE.MeshStandardMaterial({ color: 0x1f2933, roughness: 0.7, metalness: 0.08, flatShading: true });
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.15, 0.18), supportMaterial);
+        post.position.y = 0.58;
+        group.add(post);
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(1.25, 3.15, 0.28), screenMaterial);
+        panel.position.y = 2.45;
+        group.add(panel);
+
+        const displayColors = [0xff6b5f, 0xffd65a, 0x3ee6a8, 0x2f8cff, 0xa970ff];
+        for (let row = 0; row < 8; row += 1) {
+          for (let column = 0; column < 3; column += 1) {
+            const pixel = new THREE.Mesh(
+              new THREE.BoxGeometry(0.2, 0.16, 0.04),
+              new THREE.MeshBasicMaterial({ color: displayColors[(row + column) % displayColors.length] })
+            );
+            pixel.position.set(-0.3 + column * 0.3, 1.35 + row * 0.29, -side * 0.165);
+            group.add(pixel);
+          }
+        }
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createAdditionalTrees() {
+        [
+          [0.02, 1, 7.1, 7],
+          [0.19, -1, 7.4, 8],
+          [0.42, 1, 7.0, 9],
+          [0.62, -1, 7.5, 10],
+          [0.91, 1, 7.2, 11]
+        ].forEach(([section, side, offset, variant]) => {
+          createTree(LOGICAL_LAP_LENGTH * section, side, offset, variant);
+        });
+      }
+
       function createEnvironmentProps() {
         const propOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 0.8;
         const standOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 3.1;
@@ -3207,11 +3370,23 @@
           ['arquibancada 1', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.05, -standOffset, [0xe23f48, 0xf2f4f7, 0x2f78d0])],
           ['arquibancada 2', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.36, standOffset, [0x7748d5, 0xf4ca43, 0xf2f4f7])],
           ['arquibancada 3', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.56, -standOffset, [0x2f78d0, 0xf2f4f7, 0xe23f48])],
-          ['prédio dos boxes', createPitBuilding],
+          ['torre de controle', createRaceControlTower],
+          ['cerca da reta principal', () => createChainLinkFence(LOGICAL_LAP_LENGTH * 0.048, -1, 4.8)],
+          ['cerca da arquibancada oposta', () => createChainLinkFence(LOGICAL_LAP_LENGTH * 0.355, 1, 4.5)],
+          ['cerca da arquibancada interna', () => createChainLinkFence(LOGICAL_LAP_LENGTH * 0.555, -1, 4.3)],
+          ['poste da reta principal 1', () => createTrackLight(LOGICAL_LAP_LENGTH * 0.012, -1)],
+          ['poste da reta principal 2', () => createTrackLight(LOGICAL_LAP_LENGTH * 0.13, -1)],
+          ['poste da reta oposta 1', () => createTrackLight(LOGICAL_LAP_LENGTH * 0.34, 1)],
+          ['poste da reta oposta 2', () => createTrackLight(LOGICAL_LAP_LENGTH * 0.42, 1)],
+          ['barreira decorativa 1', () => createDecorativeBarrier(LOGICAL_LAP_LENGTH * 0.235, 1, 3.4)],
+          ['barreira decorativa 2', () => createDecorativeBarrier(LOGICAL_LAP_LENGTH * 0.515, -1, 3.1)],
+          ['barreira decorativa 3', () => createDecorativeBarrier(LOGICAL_LAP_LENGTH * 0.745, 1, 3.5)],
+          ['torre de cronometragem', () => createTimingTower(LOGICAL_LAP_LENGTH * 0.385, 1)],
           ['bandeira azul', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.07, -standOffset + 0.6, 0x2f8cff, 1)],
           ['bandeira laranja', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.075, -standOffset + 0.6, 0xff8a3d, -1)],
           ['bandeira roxa', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.37, standOffset - 0.4, 0xa970ff, 1)],
           ['árvores e arbustos', createTreeClusters],
+          ['árvores adicionais', createAdditionalTrees],
           ['lago', createPond]
         ];
         optionalProps.forEach(([label, factory]) => addOptionalEnvironmentProp(label, factory));
