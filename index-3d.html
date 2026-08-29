@@ -3000,57 +3000,113 @@
           metalness: 0,
           flatShading: true
         });
+        const hubMaterial = new THREE.MeshStandardMaterial({
+          color: 0x343d47,
+          roughness: 0.74,
+          metalness: 0.18,
+          flatShading: true
+        });
 
-        // A carroceria e o bico afunilam na direção +X, frente lógica do carro.
+        // Frente lógica em +X: corpo longo e baixo, com o bico avançando até a asa.
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.06, 0.7), darkMaterial);
+        floor.position.set(-0.14, 0.19, 0);
+        group.add(floor);
+
         const chassis = new THREE.Mesh(
-          createTaperedPrismGeometry(1.28, 0.32, 0.5, 0.27),
+          createTaperedPrismGeometry(1.55, 0.28, 0.52, 0.24),
           bodyMaterial
         );
-        chassis.position.set(-0.08, 0.23, 0);
+        chassis.position.set(-0.13, 0.22, 0);
         group.add(chassis);
 
         const nose = new THREE.Mesh(
-          createTaperedPrismGeometry(0.72, 0.16, 0.28, 0.11),
+          createTaperedPrismGeometry(1.05, 0.13, 0.24, 0.055),
           bodyMaterial
         );
-        nose.position.set(0.76, 0.24, 0);
+        nose.position.set(0.88, 0.23, 0);
         group.add(nose);
 
         const engineCover = new THREE.Mesh(
-          createTaperedPrismGeometry(0.5, 0.25, 0.3, 0.2),
+          createTaperedPrismGeometry(0.72, 0.3, 0.14, 0.3),
           bodyMaterial
         );
-        engineCover.position.set(-0.34, 0.51, 0);
+        engineCover.position.set(-0.43, 0.48, 0);
         group.add(engineCover);
 
-        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 5), darkMaterial);
-        cockpit.scale.set(1.35, 0.72, 0.9);
-        cockpit.position.set(0.03, 0.58, 0);
-        group.add(cockpit);
+        // Sidepods separados: estreitos na frente e mais cheios junto ao eixo traseiro.
+        [-1, 1].forEach((side) => {
+          const sidepod = new THREE.Mesh(
+            createTaperedPrismGeometry(0.82, 0.19, 0.28, 0.15),
+            bodyMaterial
+          );
+          sidepod.position.set(-0.18, 0.3, side * 0.3);
+          group.add(sidepod);
+        });
 
-        const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.94), darkMaterial);
-        frontWing.position.set(1.13, 0.17, 0);
+        const cockpitSurround = new THREE.Mesh(
+          createTaperedPrismGeometry(0.44, 0.17, 0.32, 0.22),
+          bodyMaterial
+        );
+        cockpitSurround.position.set(0.0, 0.46, 0);
+        group.add(cockpitSurround);
+
+        const cockpitOpening = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.08, 0.18), darkMaterial);
+        cockpitOpening.position.set(-0.01, 0.62, 0);
+        group.add(cockpitOpening);
+
+        // Halo low-poly em forma de U, com duas hastes e pilar central dianteiro.
+        [-1, 1].forEach((side) => {
+          const haloRail = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.035, 0.035), darkMaterial);
+          haloRail.position.set(-0.01, 0.72, side * 0.15);
+          group.add(haloRail);
+        });
+        const haloFront = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.3), darkMaterial);
+        haloFront.position.set(0.16, 0.72, 0);
+        group.add(haloFront);
+
+        const haloPillar = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.18, 0.035), darkMaterial);
+        haloPillar.position.set(0.16, 0.63, 0);
+        group.add(haloPillar);
+
+        const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.055, 1.02), darkMaterial);
+        frontWing.position.set(1.45, 0.15, 0);
         group.add(frontWing);
 
-        const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.82), darkMaterial);
-        rearWing.position.set(-0.79, 0.63, 0);
+        [-1, 1].forEach((side) => {
+          const frontWingEndplate = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.04), darkMaterial);
+          frontWingEndplate.position.set(1.43, 0.2, side * 0.51);
+          group.add(frontWingEndplate);
+        });
+
+        const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.11, 1.02), darkMaterial);
+        rearWing.position.set(-1.0, 0.7, 0);
         group.add(rearWing);
 
+        const rearWingBeam = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.065, 0.82), darkMaterial);
+        rearWingBeam.position.set(-0.94, 0.53, 0);
+        group.add(rearWingBeam);
+
         [-1, 1].forEach((side) => {
-          const rearWingStrut = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.32, 0.07), darkMaterial);
-          rearWingStrut.position.set(-0.75, 0.46, side * 0.27);
+          const rearWingStrut = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.36, 0.065), darkMaterial);
+          rearWingStrut.position.set(-0.95, 0.51, side * 0.33);
           group.add(rearWingStrut);
         });
 
-        const wheelGeometry = new THREE.CylinderGeometry(0.19, 0.19, 0.17, 10);
+        const wheelGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.2, 10);
+        const hubGeometry = new THREE.CylinderGeometry(0.09, 0.09, 0.205, 8);
         [
-          [-0.46, -0.38], [-0.46, 0.38],
-          [0.5, -0.35], [0.5, 0.35]
+          [-0.7, -0.49], [-0.7, 0.49],
+          [0.78, -0.49], [0.78, 0.49]
         ].forEach(([x, z]) => {
           const wheel = new THREE.Mesh(wheelGeometry, tireMaterial);
           wheel.rotation.x = Math.PI / 2;
-          wheel.position.set(x, 0.22, z);
+          wheel.position.set(x, 0.23, z);
           group.add(wheel);
+
+          const hub = new THREE.Mesh(hubGeometry, hubMaterial);
+          hub.rotation.x = Math.PI / 2;
+          hub.position.set(x, 0.23, z);
+          group.add(hub);
         });
 
         const glow = new THREE.Mesh(
@@ -3059,7 +3115,7 @@
         );
         glow.rotation.x = -Math.PI / 2;
         glow.position.y = 0.055;
-        glow.scale.set(1.8, 0.72, 1);
+        glow.scale.set(2.25, 0.88, 1);
         group.add(glow);
         group.traverse((child) => {
           if (!child.isMesh || child === glow) return;
