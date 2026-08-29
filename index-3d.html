@@ -1168,6 +1168,7 @@
       const TRACK_SURFACE_WIDTH = TRACK_WIDTH + 2 * (TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH);
       const TRACK_CLEARANCE_MARGIN = 0.7;
       const MIN_TRACK_CLEARANCE = TRACK_SURFACE_WIDTH + TRACK_CLEARANCE_MARGIN;
+      const MIN_PROP_CLEARANCE = 0.48;
       const GROUND_WIDTH = 108;
       const GROUND_DEPTH = 88;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1282,6 +1283,7 @@
       const carObjects = new Map();
       let confettiSystem = null;
       const propPlacementReport = [];
+      const occupiedPropFootprints = [];
 
       const state = {
         phase: 'betting',
@@ -2814,7 +2816,16 @@
       }
 
       function createTireBarrier(distance, lateralOffset, accentColor) {
-        const pose = getPositionAtDistance(distance, lateralOffset);
+        const side = Math.sign(lateralOffset) || 1;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          Math.abs(lateralOffset),
+          { length: 2.35, depth: 0.86 },
+          'barreira de pneus'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
         const group = new THREE.Group();
         group.position.set(pose.x, 0, pose.z);
         group.rotation.y = -pose.angle;
@@ -2839,13 +2850,16 @@
       }
 
       function createPond() {
+        const placement = findSafeWorldPropPose(0, 0, { length: 5.5, depth: 3.6 }, 'lago');
+        if (!placement) return;
+        const pose = placement.pose;
         const sand = new THREE.Mesh(
           new THREE.CircleGeometry(2.65, 28),
           new THREE.MeshStandardMaterial({ color: 0xe7cf91, roughness: 0.92, flatShading: true })
         );
         sand.rotation.x = -Math.PI / 2;
         sand.scale.set(1, 0.62, 1);
-        sand.position.set(0, -0.052, 0);
+        sand.position.set(pose.x, -0.052, pose.z);
         sand.receiveShadow = true;
         scene.add(sand);
 
@@ -2855,7 +2869,7 @@
         );
         water.rotation.x = -Math.PI / 2;
         water.scale.set(1, 0.58, 1);
-        water.position.set(0, -0.042, 0);
+        water.position.set(pose.x, -0.042, pose.z);
         water.receiveShadow = true;
         scene.add(water);
       }
@@ -3015,6 +3029,52 @@
         ));
       }
 
+      function distanceBetweenPropFootprints(first, second) {
+        if (
+          first.corners.some((corner) => pointInsidePropFootprint(corner, second)) ||
+          second.corners.some((corner) => pointInsidePropFootprint(corner, first))
+        ) return 0;
+
+        const firstEdges = first.corners.map((corner, index) => [
+          corner,
+          first.corners[(index + 1) % first.corners.length]
+        ]);
+        const secondEdges = second.corners.map((corner, index) => [
+          corner,
+          second.corners[(index + 1) % second.corners.length]
+        ]);
+        let minimumDistance = Infinity;
+        firstEdges.forEach(([firstStart, firstEnd]) => {
+          secondEdges.forEach(([secondStart, secondEnd]) => {
+            minimumDistance = Math.min(
+              minimumDistance,
+              lineSegmentDistance(firstStart, firstEnd, secondStart, secondEnd)
+            );
+          });
+        });
+        return minimumDistance;
+      }
+
+      function findPropCollision(footprint, clearance = MIN_PROP_CLEARANCE) {
+        for (const occupied of occupiedPropFootprints) {
+          const requiredClearance = Math.max(clearance, occupied.clearance);
+          const distance = distanceBetweenPropFootprints(footprint, occupied.footprint);
+          if (distance < requiredClearance) {
+            return { label: occupied.label, distance, requiredClearance };
+          }
+        }
+        return null;
+      }
+
+      function reservePropFootprint(label, footprint, footprintSpec) {
+        if (footprintSpec.reserve === false) return;
+        occupiedPropFootprints.push({
+          label,
+          footprint,
+          clearance: footprintSpec.propClearance ?? MIN_PROP_CLEARANCE
+        });
+      }
+
       function findTrackSafePropPose(distance, side, preferredOffset, footprintSpec, label) {
         const requiredClearance = TRACK_SURFACE_WIDTH / 2 + 0.62;
         const startingOffset = Math.max(preferredOffset, TRACK_SURFACE_WIDTH / 2 + 0.8);
@@ -3024,8 +3084,13 @@
           const pose = getPositionAtDistance(distance, side * (startingOffset + extra));
           const footprint = getPropFootprint(pose, footprintSpec);
           const clearance = distanceFromFootprintToTrack(footprint);
-          if (clearance < requiredClearance || !footprintFitsGround(footprint)) continue;
+          const propCollision = footprintSpec.reserve === false ? null : findPropCollision(
+            footprint,
+            footprintSpec.propClearance ?? MIN_PROP_CLEARANCE
+          );
+          if (clearance < requiredClearance || !footprintFitsGround(footprint) || propCollision) continue;
           propPlacementReport.push({ label, clearance, requiredClearance });
+          reservePropFootprint(label, footprint, footprintSpec);
           return { pose, footprint, clearance };
         }
         console.warn(`Prop opcional ignorado após ${maximumAttempts} tentativas seguras: ${label}`);
@@ -3033,29 +3098,49 @@
       }
 
       function findSafeWorldPropPose(x, z, footprintSpec, label, angle = 0) {
-        const pose = {
-          x,
-          y: 0,
-          z,
-          angle,
-          normalX: -Math.sin(angle),
-          normalZ: Math.cos(angle)
-        };
-        const footprint = getPropFootprint(pose, footprintSpec);
         const requiredClearance = TRACK_SURFACE_WIDTH / 2 + 0.62;
-        const clearance = distanceFromFootprintToTrack(footprint);
-        if (clearance < requiredClearance || !footprintFitsGround(footprint)) {
-          console.warn(`Prop de terreno ignorado por proximidade da pista: ${label}`);
-          return null;
+        const maximumAttempts = footprintSpec.reserve === false ? 1 : 24;
+        for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+          const searchRadius = attempt === 0 ? 0 : 0.72 + Math.ceil(attempt / 6) * 0.72;
+          const searchAngle = attempt * 2.399963229728653;
+          const pose = {
+            x: x + Math.cos(searchAngle) * searchRadius,
+            y: 0,
+            z: z + Math.sin(searchAngle) * searchRadius,
+            angle,
+            normalX: -Math.sin(angle),
+            normalZ: Math.cos(angle)
+          };
+          const footprint = getPropFootprint(pose, footprintSpec);
+          const clearance = distanceFromFootprintToTrack(footprint);
+          const propCollision = footprintSpec.reserve === false ? null : findPropCollision(
+            footprint,
+            footprintSpec.propClearance ?? MIN_PROP_CLEARANCE
+          );
+          if (clearance < requiredClearance || !footprintFitsGround(footprint) || propCollision) continue;
+          propPlacementReport.push({ label, clearance, requiredClearance });
+          reservePropFootprint(label, footprint, footprintSpec);
+          return { pose, footprint, clearance };
         }
-        propPlacementReport.push({ label, clearance, requiredClearance });
-        return { pose, footprint, clearance };
+        console.warn(`Prop de terreno ignorado após ${maximumAttempts} tentativas seguras: ${label}`);
+        return null;
       }
 
       function validateEnvironmentPlacements() {
         const invalid = propPlacementReport.filter((placement) => placement.clearance < placement.requiredClearance);
         if (invalid.length) {
           console.warn(`Prop opcional removido da área protegida: ${invalid[0].label}`);
+        }
+        for (let firstIndex = 0; firstIndex < occupiedPropFootprints.length; firstIndex += 1) {
+          for (let secondIndex = firstIndex + 1; secondIndex < occupiedPropFootprints.length; secondIndex += 1) {
+            const first = occupiedPropFootprints[firstIndex];
+            const second = occupiedPropFootprints[secondIndex];
+            const distance = distanceBetweenPropFootprints(first.footprint, second.footprint);
+            if (distance < Math.max(first.clearance, second.clearance)) {
+              console.warn(`Conflito residual de cenário: ${first.label} / ${second.label}`);
+              return;
+            }
+          }
         }
       }
 
@@ -3293,7 +3378,7 @@
           distance,
           side,
           5.7,
-          { length: 0.72, depth: 0.72 },
+          { length: 1.35, depth: 0.82 },
           'poste de iluminação'
         );
         if (!placement) return;
@@ -3432,10 +3517,11 @@
       }
 
       function createTerrainMound(x, z, length, depth, height, rotation = 0, color = 0x6eae54) {
-        const placement = findSafeWorldPropPose(x, z, { length, depth }, 'elevação de terreno', rotation);
+        const placement = findSafeWorldPropPose(x, z, { length, depth, reserve: false }, 'elevação de terreno', rotation);
         if (!placement) return;
+        const pose = placement.pose;
         const group = new THREE.Group();
-        group.position.set(x, -0.03, z);
+        group.position.set(pose.x, -0.03, pose.z);
         group.rotation.y = -rotation;
         const soil = new THREE.Mesh(
           new THREE.CylinderGeometry(0.84, 1, 1, 8),
@@ -3466,10 +3552,10 @@
       }
 
       function createWaterChannel() {
-        const placement = findSafeWorldPropPose(-43, 0, { length: 7.2, depth: 29 }, 'canal de água');
+        const placement = findSafeWorldPropPose(-43, 0, { length: 8.4, depth: 29 }, 'canal de água');
         if (!placement) return;
         const group = new THREE.Group();
-        group.position.set(-43, 0, 0);
+        group.position.set(placement.pose.x, 0, placement.pose.z);
         const water = new THREE.Mesh(
           new THREE.PlaneGeometry(6.5, 28),
           new THREE.MeshStandardMaterial({ color: 0x48b9e4, roughness: 0.34, metalness: 0.06, flatShading: true })
@@ -3500,7 +3586,7 @@
         const placement = findSafeWorldPropPose(42, -27, { length: 15.5, depth: 10.8 }, 'estacionamento');
         if (!placement) return;
         const group = new THREE.Group();
-        group.position.set(42, 0, -27);
+        group.position.set(placement.pose.x, 0, placement.pose.z);
         const asphalt = new THREE.Mesh(
           new THREE.PlaneGeometry(15, 10.2),
           new THREE.MeshStandardMaterial({ color: 0x38434c, roughness: 0.94, flatShading: true })
@@ -3553,7 +3639,7 @@
           distance,
           side,
           preferredOffset,
-          { length: radius * 2.2, depth: radius * 2.2 },
+          { length: radius * 2.6, depth: radius * 2.35 },
           'rocha de cenário'
         );
         if (!placement) return;
@@ -3603,7 +3689,7 @@
         const placement = findSafeWorldPropPose(-42, -30, { length: 4.2, depth: 4.2 }, 'torre de observação');
         if (!placement) return;
         const group = new THREE.Group();
-        group.position.set(-42, 0, -30);
+        group.position.set(placement.pose.x, 0, placement.pose.z);
         const woodMaterial = new THREE.MeshStandardMaterial({ color: 0x79533d, roughness: 0.96, flatShading: true });
         const cabinMaterial = new THREE.MeshStandardMaterial({ color: 0xe9edf0, roughness: 0.84, flatShading: true });
         const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x334654, roughness: 0.5, metalness: 0.1, flatShading: true });
@@ -3681,6 +3767,8 @@
       }
 
       function createEnvironmentProps() {
+        propPlacementReport.length = 0;
+        occupiedPropFootprints.length = 0;
         const propOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 0.8;
         const standOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 3.1;
         const optionalProps = [
@@ -3688,8 +3776,6 @@
           ['relevo do terreno', createTerrainRelief],
           ['canal e ponte', createWaterChannel],
           ['estacionamento', createParkingLot],
-          ['rochas de transição', createRockScatter],
-          ['bosques densos', createDenseForestPatches],
           ['torre de observação', createWatchtower],
           ['telão da reta principal', createTracksideBillboard],
           ['barreira de pneus 1', () => createTireBarrier(LOGICAL_LAP_LENGTH * 0.25, propOffset, 0xe6425f)],
@@ -3712,6 +3798,8 @@
           ['bandeira azul', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.07, -standOffset + 0.6, 0x2f8cff, 1)],
           ['bandeira laranja', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.075, -standOffset + 0.6, 0xff8a3d, -1)],
           ['bandeira roxa', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.37, standOffset - 0.4, 0xa970ff, 1)],
+          ['rochas de transição', createRockScatter],
+          ['bosques densos', createDenseForestPatches],
           ['árvores e arbustos', createTreeClusters],
           ['árvores adicionais', createAdditionalTrees],
           ['lago', createPond]
