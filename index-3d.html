@@ -1279,6 +1279,7 @@
       let camera;
       const carObjects = new Map();
       let confettiSystem = null;
+      const propPlacementReport = [];
 
       const state = {
         phase: 'betting',
@@ -2858,8 +2859,20 @@
       }
 
       function createGrandstand(distance, lateralOffset, seatColors) {
-        const pose = getPositionAtDistance(distance, lateralOffset);
         const side = Math.sign(lateralOffset) || 1;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          Math.abs(lateralOffset),
+          {
+            length: 5.4,
+            depth: 2.7,
+            offsetLateral: side * 0.94
+          },
+          'arquibancada'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
         const group = new THREE.Group();
         group.position.set(pose.x, 0, pose.z);
         group.rotation.y = -pose.angle;
@@ -2943,21 +2956,94 @@
         }
       }
 
-      function findClearSceneryPose(distance, side, preferredOffset) {
-        const minimumClearance = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 1.35;
-        for (let extra = 0; extra <= 6; extra += 0.75) {
-          const pose = getPositionAtDistance(distance, side * (preferredOffset + extra));
-          const nearestTrackPoint = state.view.pathSamples.reduce((nearest, sample) => (
-            Math.min(nearest, Math.hypot(pose.x - sample.x, pose.z - sample.z))
-          ), Infinity);
-          if (nearestTrackPoint >= minimumClearance && Math.abs(pose.x) < 44 && Math.abs(pose.z) < 34) return pose;
+      function getPropFootprint(pose, footprint) {
+        const tangentX = Math.cos(pose.angle);
+        const tangentZ = Math.sin(pose.angle);
+        const normalX = pose.normalX;
+        const normalZ = pose.normalZ;
+        const centerX = pose.x + tangentX * (footprint.offsetForward || 0) + normalX * (footprint.offsetLateral || 0);
+        const centerZ = pose.z + tangentZ * (footprint.offsetForward || 0) + normalZ * (footprint.offsetLateral || 0);
+        const halfLength = footprint.length / 2;
+        const halfDepth = footprint.depth / 2;
+        const corners = [
+          [-halfLength, -halfDepth],
+          [halfLength, -halfDepth],
+          [halfLength, halfDepth],
+          [-halfLength, halfDepth]
+        ].map(([forward, lateral]) => ({
+          x: centerX + tangentX * forward + normalX * lateral,
+          z: centerZ + tangentZ * forward + normalZ * lateral
+        }));
+        return { centerX, centerZ, tangentX, tangentZ, normalX, normalZ, halfLength, halfDepth, corners };
+      }
+
+      function pointInsidePropFootprint(point, footprint) {
+        const deltaX = point.x - footprint.centerX;
+        const deltaZ = point.z - footprint.centerZ;
+        const localForward = deltaX * footprint.tangentX + deltaZ * footprint.tangentZ;
+        const localLateral = deltaX * footprint.normalX + deltaZ * footprint.normalZ;
+        return Math.abs(localForward) <= footprint.halfLength && Math.abs(localLateral) <= footprint.halfDepth;
+      }
+
+      function distanceFromFootprintToTrack(footprint) {
+        let minimumDistance = Infinity;
+        const edges = footprint.corners.map((corner, index) => [
+          corner,
+          footprint.corners[(index + 1) % footprint.corners.length]
+        ]);
+        for (let index = 0; index < state.view.pathSamples.length - 1; index += 1) {
+          const trackStart = state.view.pathSamples[index];
+          const trackEnd = state.view.pathSamples[index + 1];
+          if (pointInsidePropFootprint(trackStart, footprint) || pointInsidePropFootprint(trackEnd, footprint)) return 0;
+          edges.forEach(([edgeStart, edgeEnd]) => {
+            minimumDistance = Math.min(
+              minimumDistance,
+              lineSegmentDistance(trackStart, trackEnd, edgeStart, edgeEnd)
+            );
+          });
+          if (minimumDistance === 0) return 0;
         }
+        return minimumDistance;
+      }
+
+      function footprintFitsGround(footprint) {
+        return footprint.corners.every((corner) => Math.abs(corner.x) <= 47 && Math.abs(corner.z) <= 37);
+      }
+
+      function findTrackSafePropPose(distance, side, preferredOffset, footprintSpec, label, required = true) {
+        const requiredClearance = TRACK_SURFACE_WIDTH / 2 + 0.62;
+        const startingOffset = Math.max(preferredOffset, TRACK_SURFACE_WIDTH / 2 + 0.8);
+        for (let extra = 0; extra <= 10; extra += 0.45) {
+          const pose = getPositionAtDistance(distance, side * (startingOffset + extra));
+          const footprint = getPropFootprint(pose, footprintSpec);
+          const clearance = distanceFromFootprintToTrack(footprint);
+          if (clearance < requiredClearance || !footprintFitsGround(footprint)) continue;
+          propPlacementReport.push({ label, clearance, requiredClearance });
+          return { pose, footprint, clearance };
+        }
+        if (required) throw new Error(`Não foi possível posicionar ${label} fora da área protegida da pista.`);
+        console.warn(`Prop descartado por falta de posição segura: ${label}`);
         return null;
       }
 
+      function validateEnvironmentPlacements() {
+        const invalid = propPlacementReport.filter((placement) => placement.clearance < placement.requiredClearance);
+        if (invalid.length) {
+          throw new Error(`Cenário inválido: ${invalid[0].label} invade a área protegida da pista.`);
+        }
+      }
+
       function createTree(distance, side, preferredOffset, variant = 0) {
-        const pose = findClearSceneryPose(distance, side, preferredOffset);
-        if (!pose) return;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          preferredOffset,
+          { length: 2.1, depth: 2.1 },
+          'árvore/arbusto',
+          false
+        );
+        if (!placement) return;
+        const pose = placement.pose;
         const group = new THREE.Group();
         group.position.set(pose.x, 0, pose.z);
 
@@ -3020,10 +3106,19 @@
       }
 
       function createPitBuilding() {
-        const distance = LOGICAL_LAP_LENGTH * 0.025;
-        const side = 1;
-        const lateralOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 4.3;
-        const pose = getPositionAtDistance(distance, lateralOffset);
+        // A área dos boxes fica no lado externo da reta e longe da linha de
+        // chegada, preservando também o enquadramento da câmera de celebração.
+        const distance = LOGICAL_LAP_LENGTH * 0.135;
+        const side = -1;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          7.2,
+          { length: 7.9, depth: 2.95 },
+          'prédio dos boxes'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
         const group = new THREE.Group();
         group.position.set(pose.x, 0, pose.z);
         group.rotation.y = -pose.angle;
@@ -3059,7 +3154,16 @@
       }
 
       function createFlagPole(distance, lateralOffset, color, flagDirection = 1) {
-        const pose = getPositionAtDistance(distance, lateralOffset);
+        const side = Math.sign(lateralOffset) || 1;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          Math.abs(lateralOffset),
+          { length: 1.15, depth: 0.24, offsetForward: flagDirection * 0.48 },
+          'mastro de bandeira'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
         const group = new THREE.Group();
         group.position.set(pose.x, 0, pose.z);
         group.rotation.y = -pose.angle;
@@ -3095,6 +3199,7 @@
         createFlagPole(LOGICAL_LAP_LENGTH * 0.37, standOffset - 0.4, 0xa970ff, 1);
         createTreeClusters();
         createPond();
+        validateEnvironmentPlacements();
       }
 
       function createTrackScene() {
