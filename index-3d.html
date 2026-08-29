@@ -1168,6 +1168,8 @@
       const TRACK_SURFACE_WIDTH = TRACK_WIDTH + 2 * (TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH);
       const TRACK_CLEARANCE_MARGIN = 0.7;
       const MIN_TRACK_CLEARANCE = TRACK_SURFACE_WIDTH + TRACK_CLEARANCE_MARGIN;
+      const GROUND_WIDTH = 108;
+      const GROUND_DEPTH = 88;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const TAB_ID = (() => {
         try {
@@ -2943,14 +2945,14 @@
           metalness: 0,
           flatShading: true
         }));
-        const stripeDepth = 76 / 12;
+        const stripeDepth = GROUND_DEPTH / 12;
         for (let stripe = 0; stripe < 12; stripe += 1) {
           const patch = new THREE.Mesh(
-            new THREE.PlaneGeometry(96, stripeDepth + 0.02),
+            new THREE.PlaneGeometry(GROUND_WIDTH, stripeDepth + 0.02),
             stripeMaterials[stripe % stripeMaterials.length]
           );
           patch.rotation.x = -Math.PI / 2;
-          patch.position.set(0, -0.074, -38 + stripeDepth * (stripe + 0.5));
+          patch.position.set(0, -0.074, -GROUND_DEPTH / 2 + stripeDepth * (stripe + 0.5));
           patch.receiveShadow = true;
           scene.add(patch);
         }
@@ -3007,13 +3009,18 @@
       }
 
       function footprintFitsGround(footprint) {
-        return footprint.corners.every((corner) => Math.abs(corner.x) <= 47 && Math.abs(corner.z) <= 37);
+        return footprint.corners.every((corner) => (
+          Math.abs(corner.x) <= GROUND_WIDTH / 2 - 1 &&
+          Math.abs(corner.z) <= GROUND_DEPTH / 2 - 1
+        ));
       }
 
-      function findTrackSafePropPose(distance, side, preferredOffset, footprintSpec, label, required = true) {
+      function findTrackSafePropPose(distance, side, preferredOffset, footprintSpec, label) {
         const requiredClearance = TRACK_SURFACE_WIDTH / 2 + 0.62;
         const startingOffset = Math.max(preferredOffset, TRACK_SURFACE_WIDTH / 2 + 0.8);
-        for (let extra = 0; extra <= 10; extra += 0.45) {
+        const maximumAttempts = 24;
+        for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+          const extra = attempt * 0.45;
           const pose = getPositionAtDistance(distance, side * (startingOffset + extra));
           const footprint = getPropFootprint(pose, footprintSpec);
           const clearance = distanceFromFootprintToTrack(footprint);
@@ -3021,15 +3028,22 @@
           propPlacementReport.push({ label, clearance, requiredClearance });
           return { pose, footprint, clearance };
         }
-        if (required) throw new Error(`Não foi possível posicionar ${label} fora da área protegida da pista.`);
-        console.warn(`Prop descartado por falta de posição segura: ${label}`);
+        console.warn(`Prop opcional ignorado após ${maximumAttempts} tentativas seguras: ${label}`);
         return null;
       }
 
       function validateEnvironmentPlacements() {
         const invalid = propPlacementReport.filter((placement) => placement.clearance < placement.requiredClearance);
         if (invalid.length) {
-          throw new Error(`Cenário inválido: ${invalid[0].label} invade a área protegida da pista.`);
+          console.warn(`Prop opcional removido da área protegida: ${invalid[0].label}`);
+        }
+      }
+
+      function addOptionalEnvironmentProp(label, factory) {
+        try {
+          factory();
+        } catch (error) {
+          console.warn(`Falha isolada no cenário opcional (${label}).`, error);
         }
       }
 
@@ -3039,8 +3053,7 @@
           side,
           preferredOffset,
           { length: 2.1, depth: 2.1 },
-          'árvore/arbusto',
-          false
+          'árvore/arbusto'
         );
         if (!placement) return;
         const pose = placement.pose;
@@ -3108,7 +3121,7 @@
       function createPitBuilding() {
         // A área dos boxes fica no lado externo da reta e longe da linha de
         // chegada, preservando também o enquadramento da câmera de celebração.
-        const distance = LOGICAL_LAP_LENGTH * 0.135;
+        const distance = LOGICAL_LAP_LENGTH * 0.085;
         const side = -1;
         const placement = findTrackSafePropPose(
           distance,
@@ -3188,23 +3201,26 @@
       function createEnvironmentProps() {
         const propOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 0.8;
         const standOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 3.1;
-        createTireBarrier(LOGICAL_LAP_LENGTH * 0.25, propOffset, 0xe6425f);
-        createTireBarrier(LOGICAL_LAP_LENGTH * 0.72, -propOffset, 0xf7d14a);
-        createGrandstand(LOGICAL_LAP_LENGTH * 0.05, -standOffset, [0xe23f48, 0xf2f4f7, 0x2f78d0]);
-        createGrandstand(LOGICAL_LAP_LENGTH * 0.36, standOffset, [0x7748d5, 0xf4ca43, 0xf2f4f7]);
-        createGrandstand(LOGICAL_LAP_LENGTH * 0.56, -standOffset, [0x2f78d0, 0xf2f4f7, 0xe23f48]);
-        createPitBuilding();
-        createFlagPole(LOGICAL_LAP_LENGTH * 0.07, -standOffset + 0.6, 0x2f8cff, 1);
-        createFlagPole(LOGICAL_LAP_LENGTH * 0.075, -standOffset + 0.6, 0xff8a3d, -1);
-        createFlagPole(LOGICAL_LAP_LENGTH * 0.37, standOffset - 0.4, 0xa970ff, 1);
-        createTreeClusters();
-        createPond();
-        validateEnvironmentPlacements();
+        const optionalProps = [
+          ['barreira de pneus 1', () => createTireBarrier(LOGICAL_LAP_LENGTH * 0.25, propOffset, 0xe6425f)],
+          ['barreira de pneus 2', () => createTireBarrier(LOGICAL_LAP_LENGTH * 0.72, -propOffset, 0xf7d14a)],
+          ['arquibancada 1', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.05, -standOffset, [0xe23f48, 0xf2f4f7, 0x2f78d0])],
+          ['arquibancada 2', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.36, standOffset, [0x7748d5, 0xf4ca43, 0xf2f4f7])],
+          ['arquibancada 3', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.56, -standOffset, [0x2f78d0, 0xf2f4f7, 0xe23f48])],
+          ['prédio dos boxes', createPitBuilding],
+          ['bandeira azul', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.07, -standOffset + 0.6, 0x2f8cff, 1)],
+          ['bandeira laranja', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.075, -standOffset + 0.6, 0xff8a3d, -1)],
+          ['bandeira roxa', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.37, standOffset - 0.4, 0xa970ff, 1)],
+          ['árvores e arbustos', createTreeClusters],
+          ['lago', createPond]
+        ];
+        optionalProps.forEach(([label, factory]) => addOptionalEnvironmentProp(label, factory));
+        addOptionalEnvironmentProp('validação final', validateEnvironmentPlacements);
       }
 
       function createTrackScene() {
         const ground = new THREE.Mesh(
-          new THREE.PlaneGeometry(96, 76, 1, 1),
+          new THREE.PlaneGeometry(GROUND_WIDTH, GROUND_DEPTH, 1, 1),
           new THREE.MeshStandardMaterial({ color: 0x7dbd5f, roughness: 1, metalness: 0, flatShading: true })
         );
         ground.rotation.x = -Math.PI / 2;
@@ -3252,7 +3268,6 @@
           }
         }
 
-        createEnvironmentProps();
       }
 
       function createConfettiSystem() {
@@ -3591,12 +3606,15 @@
         scene.add(rimLight);
 
         createTrackScene();
-        confettiSystem = createConfettiSystem();
         state.race.runners.forEach((runner) => {
           const group = createLowPolyCar(runner);
           scene.add(group);
           carObjects.set(runner.id, { group, trail: createTrailObject(runner) });
         });
+        confettiSystem = createConfettiSystem();
+        // Cenário decorativo é criado por último: mesmo que um prop seja
+        // descartado, carros, câmera e loop principal já estão disponíveis.
+        createEnvironmentProps();
       }
 
       function updateTrail(runner, pose) {
