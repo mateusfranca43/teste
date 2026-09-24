@@ -18,8 +18,9 @@
   <meta name="twitter:title" content="Neon Circuit — Corrida & Apostas">
   <meta name="twitter:description" content="Quatro perfis, uma linha de chegada e apostas entre amigos.">
   <meta name="twitter:image" content="https://neon-circuit-m43.mateusfla43.chatgpt.site/og.png">
-  <title>Neon Circuit — Corrida & Apostas</title>
+  <title>Neon Circuit 3D — Experimento Three.js</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -165,6 +166,118 @@
       display: block;
       width: 100%;
       height: clamp(430px, 48vw, 620px);
+    }
+
+    .race-3d-hud {
+      position: absolute;
+      z-index: 3;
+      top: 0;
+      right: 0;
+      left: 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+      padding: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, .08);
+      background: rgba(4, 8, 13, .92);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+    }
+
+    .race-3d-card {
+      min-width: 0;
+      padding: 8px 10px;
+      border: 1px solid rgba(var(--runner-rgb), .34);
+      border-left: 3px solid rgb(var(--runner-rgb));
+      border-radius: 8px;
+      background: rgba(7, 12, 18, .96);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(10px);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    }
+
+    .race-3d-card:hover,
+    .race-3d-card:focus-visible,
+    .race-3d-card.is-camera-target {
+      border-color: rgba(var(--runner-rgb), .9);
+      box-shadow: 0 0 0 1px rgba(var(--runner-rgb), .22), 0 10px 30px rgba(0, 0, 0, .32);
+      outline: none;
+    }
+
+    .race-3d-card.is-camera-target {
+      transform: translateY(2px);
+      background: rgba(9, 15, 23, .99);
+    }
+
+    .race-3d-card__top,
+    .race-3d-card__bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 5px;
+    }
+
+    .race-3d-card__top {
+      color: #f3f6fa;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: .09em;
+    }
+
+    .race-3d-card__top strong {
+      color: rgb(var(--runner-rgb));
+    }
+
+    .race-3d-card__bottom {
+      margin-top: 5px;
+      color: #8d99a8;
+      font-size: 7px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .lap-3d {
+      position: absolute;
+      z-index: 3;
+      right: 50%;
+      bottom: 13%;
+      transform: translateX(50%);
+      pointer-events: none;
+      color: rgba(255, 255, 255, .48);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .lap-3d strong {
+      display: block;
+      margin-top: 3px;
+      color: #f5f7fa;
+      font-size: 18px;
+      letter-spacing: .08em;
+    }
+
+    .race-minimap {
+      position: absolute;
+      z-index: 4;
+      right: 16px;
+      bottom: 16px;
+      width: clamp(170px, 22vw, 250px);
+      aspect-ratio: 1.55;
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 12px;
+      background: rgba(5, 10, 16, .9);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, .34);
+      backdrop-filter: blur(10px);
+      pointer-events: none;
     }
 
     .race-banner {
@@ -669,9 +782,105 @@
       filter: saturate(.55);
     }
 
+    #racePanel {
+      display: none;
+    }
+
+    body.race-screen-active {
+      overflow: hidden;
+    }
+
+    #app.race-view-active {
+      width: 100%;
+      max-width: none;
+      height: 100vh;
+      padding: 0;
+    }
+
+    #app.race-view-active #dashboardHeader,
+    #app.race-view-active #bettingDashboard,
+    #app.race-view-active #dashboardFooter {
+      display: none;
+    }
+
+    #app.race-view-active #racePanel {
+      position: fixed;
+      z-index: 30;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 0 !important;
+      border: 0;
+      border-radius: 0;
+      background: #080c11;
+    }
+
+    #app.race-view-active .race-topbar {
+      z-index: 5;
+      min-height: 52px;
+      margin: 0;
+      padding: 0 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, .08);
+      background: rgba(6, 10, 15, .96);
+    }
+
+    #app.race-view-active .race-shell {
+      flex: 1;
+      min-height: 0;
+      border: 0;
+      border-radius: 0;
+    }
+
+    #app.race-view-active #raceCanvas {
+      height: 100% !important;
+    }
+
+    #app.race-view-active .lap-3d {
+      bottom: 6%;
+    }
+
     @media (max-width: 520px) {
       #raceCanvas {
         height: 390px;
+      }
+
+      .race-3d-hud {
+        top: 0;
+        right: 0;
+        left: 0;
+        gap: 3px;
+        padding: 6px;
+      }
+
+      .race-3d-card {
+        padding: 6px 5px;
+      }
+
+      .race-3d-card__top {
+        font-size: 6.5px;
+      }
+
+      .race-3d-card__top span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .race-3d-card__bottom {
+        font-size: 5.5px;
+      }
+
+      .race-3d-card__bottom span:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .race-minimap {
+        right: 8px;
+        bottom: 8px;
+        width: 142px;
+        border-radius: 9px;
       }
 
       .runner-choice {
@@ -708,7 +917,7 @@
 </head>
 <body>
   <main id="app" class="mx-auto w-full max-w-[1480px] px-4 pb-14 pt-5 sm:px-6 lg:px-8 lg:pt-7">
-    <header class="mb-5 flex flex-col gap-5 border-b border-white/[0.07] pb-5 lg:flex-row lg:items-end lg:justify-between">
+    <header id="dashboardHeader" class="mb-5 flex flex-col gap-5 border-b border-white/[0.07] pb-5 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <div class="mb-3 flex items-center gap-3">
           <span class="status-dot" aria-hidden="true"></span>
@@ -738,7 +947,7 @@
     </header>
 
     <section id="racePanel" class="panel p-3 sm:p-4" aria-labelledby="raceTitle">
-      <div class="mb-3 flex flex-wrap items-center justify-between gap-3 px-1 sm:px-2">
+      <div class="race-topbar mb-3 flex flex-wrap items-center justify-between gap-3 px-1 sm:px-2">
         <div class="flex items-center gap-3">
           <p id="raceTitle" class="eyebrow">Pista / Setor 07</p>
           <span class="h-3 w-px bg-white/10" aria-hidden="true"></span>
@@ -756,7 +965,27 @@
       </div>
 
       <div class="race-shell">
-        <canvas id="raceCanvas" role="img" aria-label="Circuito inspirado em Fórmula 1 visto de cima com quatro carros em duas voltas"></canvas>
+        <canvas id="raceCanvas" role="img" aria-label="Experimento 3D com circuito e quatro carros coloridos em duas voltas"></canvas>
+        <div id="race3dHud" class="race-3d-hud" aria-label="Selecionar câmera do corredor">
+          <div class="race-3d-card" data-runner-id="1" role="button" tabindex="0" aria-label="Seguir corredor 1" aria-pressed="true" style="--runner-rgb: 47, 140, 255">
+            <div class="race-3d-card__top"><span>C1 · 4.0×</span><strong data-role="rank">P–</strong></div>
+            <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
+          </div>
+          <div class="race-3d-card" data-runner-id="2" role="button" tabindex="0" aria-label="Seguir corredor 2" aria-pressed="false" style="--runner-rgb: 62, 230, 168">
+            <div class="race-3d-card__top"><span>C2 · 4.0×</span><strong data-role="rank">P–</strong></div>
+            <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
+          </div>
+          <div class="race-3d-card" data-runner-id="3" role="button" tabindex="0" aria-label="Seguir corredor 3" aria-pressed="false" style="--runner-rgb: 180, 92, 255">
+            <div class="race-3d-card__top"><span>C3 · 4.0×</span><strong data-role="rank">P–</strong></div>
+            <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
+          </div>
+          <div class="race-3d-card" data-runner-id="4" role="button" tabindex="0" aria-label="Seguir corredor 4" aria-pressed="false" style="--runner-rgb: 255, 122, 26">
+            <div class="race-3d-card__top"><span>C4 · 4.0×</span><strong data-role="rank">P–</strong></div>
+            <div class="race-3d-card__bottom"><span data-role="status">Pronto</span><span data-role="lap">V1/2</span></div>
+          </div>
+        </div>
+        <canvas id="raceMinimap" class="race-minimap" role="img" aria-label="Mapa geral da pista com a posição dos quatro corredores"></canvas>
+        <div class="lap-3d" aria-hidden="true">Volta<strong id="lap3d">1 / 2</strong></div>
         <div id="raceBanner" class="race-banner" aria-hidden="true">
           <strong id="raceBannerTitle">03</strong>
           <span id="raceBannerSubtitle">Sincronizando largada</span>
@@ -765,7 +994,7 @@
       <p id="raceAnnouncement" class="sr-only" aria-live="polite" aria-atomic="true"></p>
     </section>
 
-    <section class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
+    <section id="bettingDashboard" class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
       <article class="panel p-5 xl:col-span-4" aria-labelledby="friendsTitle">
         <div class="flex items-start justify-between gap-4">
           <div>
@@ -868,9 +1097,9 @@
       </article>
     </section>
 
-    <footer class="mt-6 flex flex-col gap-2 border-t border-white/[0.06] pt-4 text-[10px] leading-relaxed text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+    <footer id="dashboardFooter" class="mt-6 flex flex-col gap-2 border-t border-white/[0.06] pt-4 text-[10px] leading-relaxed text-slate-700 sm:flex-row sm:items-center sm:justify-between">
       <p>RNG isolado das apostas · Física em passo fixo · Nenhum áudio</p>
-      <p class="metric-value uppercase tracking-[0.12em]">Neon Circuit / Build 03</p>
+      <p class="metric-value uppercase tracking-[0.12em]">Neon Circuit / 3D Lab</p>
     </footer>
   </main>
 
@@ -910,7 +1139,7 @@
 
         <div class="mt-6 flex flex-col-reverse gap-2 border-t border-white/[0.07] pt-5 sm:flex-row sm:justify-end">
           <button id="reviewResultButton" class="secondary-button px-5" type="button">Rever pista</button>
-          <button id="newRaceButton" class="primary-button px-6" type="button">Nova corrida</button>
+          <button id="newRaceButton" class="primary-button px-6" type="button">Voltar às apostas</button>
         </div>
       </div>
     </section>
@@ -932,7 +1161,16 @@
       const TOTAL_LAPS = 2;
       const LOGICAL_LAP_LENGTH = 1000;
       const TOTAL_RACE_DISTANCE = LOGICAL_LAP_LENGTH * TOTAL_LAPS;
-      const MAX_DRIFT_OFFSET = 11;
+      const MAX_DRIFT_OFFSET = 0.38;
+      const TRACK_WIDTH = 4.2;
+      const TRACK_CURB_WIDTH = 0.42;
+      const TRACK_RUNOFF_WIDTH = 0.9;
+      const TRACK_SURFACE_WIDTH = TRACK_WIDTH + 2 * (TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH);
+      const TRACK_CLEARANCE_MARGIN = 0.7;
+      const MIN_TRACK_CLEARANCE = TRACK_SURFACE_WIDTH + TRACK_CLEARANCE_MARGIN;
+      const MIN_PROP_CLEARANCE = 0.48;
+      const GROUND_WIDTH = 108;
+      const GROUND_DEPTH = 88;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const TAB_ID = (() => {
         try {
@@ -954,17 +1192,17 @@
           trait: 'Ritmo constante',
           color: '#2f8cff',
           rgb: '47, 140, 255',
-          odds: 1.5,
+          odds: 4.0,
           baseSpeed: 110
         },
         {
           id: 2,
-          label: 'Zebra',
+          label: 'Sprinter',
           short: 'C2',
-          trait: 'Sprint improvável',
+          trait: 'Sprints imprevisíveis',
           color: '#3ee6a8',
           rgb: '62, 230, 168',
-          odds: 7.0,
+          odds: 4.0,
           baseSpeed: 110
         },
         {
@@ -974,7 +1212,7 @@
           trait: 'Velocidade instável',
           color: '#b45cff',
           rgb: '180, 92, 255',
-          odds: 3.5,
+          odds: 4.0,
           baseSpeed: 110
         },
         {
@@ -984,7 +1222,7 @@
           trait: 'Controle adaptativo',
           color: '#ff7a1a',
           rgb: '255, 122, 26',
-          odds: 2.5,
+          odds: 4.0,
           baseSpeed: 110
         }
       ];
@@ -993,6 +1231,9 @@
         app: document.querySelector('#app'),
         racePanel: document.querySelector('#racePanel'),
         canvas: document.querySelector('#raceCanvas'),
+        race3dHud: document.querySelector('#race3dHud'),
+        raceMinimap: document.querySelector('#raceMinimap'),
+        lap3d: document.querySelector('#lap3d'),
         raceBanner: document.querySelector('#raceBanner'),
         raceBannerTitle: document.querySelector('#raceBannerTitle'),
         raceBannerSubtitle: document.querySelector('#raceBannerSubtitle'),
@@ -1036,7 +1277,13 @@
         toastRegion: document.querySelector('#toastRegion')
       };
 
-      const ctx = elements.canvas.getContext('2d', { alpha: false });
+      let renderer;
+      let scene;
+      let camera;
+      const carObjects = new Map();
+      let confettiSystem = null;
+      const propPlacementReport = [];
+      const occupiedPropFootprints = [];
 
       const state = {
         phase: 'betting',
@@ -1048,6 +1295,14 @@
         dialogReturnFocus: null,
         race: null,
         view: { width: 0, height: 0, dpr: 1 },
+        cameraTargetRunnerId: 1,
+        cameraPosition: null,
+        cameraLookAt: null,
+        cameraDesiredPosition: null,
+        cameraDesiredLookAt: null,
+        celebration: null,
+        resultTimer: 0,
+        lastCameraFrame: null,
         lastFrame: null,
         lastUiUpdate: 0,
         animationId: 0
@@ -1561,6 +1816,7 @@
 
       function createRaceRunner(config, seed) {
         const eventRng = mulberry32(hashString(`${seed}:${config.id}:event`));
+        const formRng = mulberry32(hashString(`${seed}:${config.id}:form`));
         return {
           ...config,
           distance: 0,
@@ -1579,6 +1835,9 @@
           stumbleTimer: 0,
           stumbleCooldown: 0,
           balancedTarget: config.baseSpeed,
+          // Forma sorteada uma vez por corrida: todos têm o mesmo intervalo de
+          // -10% a +10%, evitando um vencedor estrutural sem apagar os perfis.
+          racePace: 0.9 + formRng() * 0.2,
           driftOffset: 0,
           racingLineOffset: 0,
           previousPathAngle: null,
@@ -1606,11 +1865,18 @@
           classification: [],
           winner: null,
           last: null,
-          finishPositions: null
+          finishPositions: null,
+          celebration: null
         };
       }
 
       function resetRunnersForLobby() {
+        if (state.resultTimer) {
+          window.clearTimeout(state.resultTimer);
+          state.resultTimer = 0;
+        }
+        state.celebration = null;
+        resetConfetti();
         const seed = 1;
         state.race = createRace(seed);
         state.race.runners.forEach((runner) => {
@@ -1622,6 +1888,11 @@
           runner.acceleration = 0;
           runner.driftOffset = 0;
           runner.previousPathAngle = null;
+        });
+        carObjects.forEach((object) => {
+          object.trail.history = [];
+          object.trail.lastDistance = Infinity;
+          object.trail.line.geometry.setDrawRange(0, 0);
         });
         state.lastFrame = null;
         state.lastUiUpdate = 0;
@@ -1675,18 +1946,19 @@
         }
 
         if (runner.id === 2) {
-          const slowBase = runner.baseSpeed * 0.95;
+          const slowBase = runner.baseSpeed * 0.98;
           if (runner.sprintTimer > 0) {
             runner.sprintTimer = Math.max(0, runner.sprintTimer - dt);
             target = runner.sprintSpeed;
             response = 3.1;
             if (runner.sprintTimer === 0) runner.sprintCooldown = 5 + runner.eventRng() * 2;
           } else {
-            // 0,1% por frame a 60 fps convertido em taxa por segundo.
-            const sprintChance = 1 - Math.exp(-0.06003 * dt);
+            // Taxa por segundo calibrada para manter o perfil imprevisível
+            // sem criar vantagem ou desvantagem persistente.
+            const sprintChance = 1 - Math.exp(-0.052 * dt);
             if (runner.sprintCooldown <= 0 && runner.eventRng() < sprintChance) {
               runner.sprintTimer = 1.5;
-              runner.sprintSpeed = slowBase * 1.4;
+              runner.sprintSpeed = slowBase * 1.35;
               target = runner.sprintSpeed;
               response = 3.1;
             } else {
@@ -1697,11 +1969,11 @@
         }
 
         if (runner.id === 3) {
-          // Caótico: +10% em retas, mas perde até 52% em curvas fechadas.
+          // Caótico: leve ganho em retas e perda proporcional nas curvas.
           const pose = state.view.trackLength ? getPositionAtDistance(runner.distance) : { cornerSeverity: 0 };
           const severity = pose.cornerSeverity || 0;
           const tightness = clamp((severity - 0.52) / 0.48, 0, 1);
-          target = runner.baseSpeed * (1.1 - tightness * (0.33 / runner.cornerGrip));
+          target = runner.baseSpeed * (1.034 - tightness * (0.22 / runner.cornerGrip));
           response = tightness > 0.3 ? 4.8 : 3.5;
         }
 
@@ -1714,7 +1986,7 @@
           response = 2.6;
         }
 
-        runner.targetSpeed = Math.max(0, target);
+        runner.targetSpeed = Math.max(0, target * runner.racePace);
         runner.speedResponse = response;
       }
 
@@ -1747,7 +2019,7 @@
           if (runner.previousPathAngle !== null) {
             const angularDelta = normalizeAngle(pose.angle - runner.previousPathAngle);
             const turnRate = angularDelta / dt;
-            const driftStrength = 0.045 * (1 + pose.cornerSeverity * 1.65);
+            const driftStrength = 0.0016 * (1 + pose.cornerSeverity * 1.65);
             const desiredDrift = clamp(-turnRate * runner.velocity * driftStrength, -MAX_DRIFT_OFFSET, MAX_DRIFT_OFFSET);
             const driftBlend = 1 - Math.exp(-5.2 * dt);
             runner.driftOffset += (desiredDrift - runner.driftOffset) * driftBlend;
@@ -1860,6 +2132,13 @@
         race.classification = classification;
         race.last = classification[classification.length - 1];
         race.finishPositions = race.runners.map((runner) => runner.progress);
+        race.celebration = {
+          winnerId,
+          startedAt: performance.now(),
+          duration: reducedMotion ? 0.55 : 1.8
+        };
+        state.celebration = race.celebration;
+        state.cameraTargetRunnerId = winnerId;
         state.phase = 'finished';
         const settlement = settleBets(race);
         state.lastResult = {
@@ -1879,8 +2158,13 @@
         renderBets();
         showRaceBanner(`C${race.winner.id}`, `${race.winner.label} venceu`, 900);
         announce(`Fim de corrida. Corredor ${race.winner.id}, ${race.winner.label}, venceu. Corredor ${race.last.id}, ${race.last.label}, era a lanterna no instante da chegada.`);
+        burstFinishConfetti(race.winner);
 
-        window.setTimeout(() => openResultOverlay(state.lastResult), 760);
+        state.resultTimer = window.setTimeout(() => {
+          state.resultTimer = 0;
+          state.celebration = null;
+          openResultOverlay(state.lastResult);
+        }, race.celebration.duration * 1000);
       }
 
       function settleBets(race) {
@@ -2048,7 +2332,16 @@
 
       function updatePhaseUi() {
         const locked = state.phase !== 'betting';
+        const raceViewActive = ['countdown', 'racing', 'finished'].includes(state.phase);
         elements.app.classList.toggle('phase-locked', locked);
+        elements.app.classList.toggle('race-view-active', raceViewActive);
+        document.body.classList.toggle('race-screen-active', raceViewActive);
+
+        // A pista só existe visualmente na tela de corrida. O resize no próximo
+        // frame garante que câmera e renderer usem todo o viewport após a troca.
+        if (raceViewActive) {
+          window.requestAnimationFrame(resizeCanvas);
+        }
 
         if (state.phase === 'betting') {
           elements.raceStateLabel.textContent = 'Apostas abertas';
@@ -2111,40 +2404,59 @@
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const width = Math.max(320, rect.width);
         const height = Math.max(380, rect.height);
-        const trackWidth = clamp(Math.min(width, height) * 0.115, 54, 86);
-        elements.canvas.width = Math.round(width * dpr);
-        elements.canvas.height = Math.round(height * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const circuit = buildCircuitGeometry(width, height);
+        const circuit = buildCircuitGeometry();
         state.view = {
           width,
           height,
           dpr,
           centerY: height / 2,
           trackLength: circuit.trackLength,
-          trackWidth,
-          laneSpacing: trackWidth / 5.3,
-          circuitPath: circuit.path,
+          trackWidth: TRACK_WIDTH,
+          laneSpacing: 0.9,
           pathSamples: circuit.samples,
-          apexes: circuit.apexes
+          apexes: circuit.apexes,
+          bounds: circuit.bounds
         };
-        drawRace();
+
+        if (!renderer) initThreeScene();
+        if (!renderer || !camera) return;
+
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(width, height, false);
+        const aspect = width / height;
+        const narrowPortrait = aspect < 0.82;
+        camera.aspect = aspect;
+        camera.fov = narrowPortrait ? 58 : 50;
+        camera.updateProjectionMatrix();
+        drawRace(1 / 60);
       }
 
-      // Waypoints normalizados: reta longa, hairpin à direita, sequência de
-      // chicanes no miolo e hairpin de retorno. O Path2D usa bezierCurveTo.
+      // Interlagos estilizado: setores amplos preservam o caráter do circuito
+      // brasileiro sem reproduzir coordenadas reais ou comprometer as barreiras.
       const CIRCUIT_SEGMENTS = [
-        { from: [.12, .86], c1: [.32, .86], c2: [.60, .86], to: [.78, .86] },
-        { c1: [.96, .86], c2: [.97, .58], to: [.74, .58] },
-        { c1: [.64, .58], c2: [.57, .54], to: [.50, .52] },
-        { c1: [.44, .48], c2: [.41, .36], to: [.33, .42] },
-        { c1: [.25, .47], c2: [.27, .26], to: [.18, .31] },
-        { c1: [.14, .15], c2: [.39, .10], to: [.50, .17] },
-        { c1: [.60, .24], c2: [.59, .34], to: [.68, .28] },
-        { c1: [.77, .22], c2: [.88, .26], to: [.84, .39] },
-        { c1: [.88, .50], c2: [.75, .57], to: [.64, .57] },
-        { c1: [.55, .57], c2: [.47, .61], to: [.40, .64] },
-        { c1: [.18, .61], c2: [.02, .82], to: [.12, .86] }
+        // Reta principal / largada e chegada.
+        { from: [.76, 1.14905], c1: [.69347, 1.19519], c2: [.21342, 1.25659], to: [.12, 1.14905] },
+        // S do Senna: duas curvas rápidas em direções opostas.
+        { c1: [.02658, 1.04150], c2: [.01274, .82670], to: [.04, .72] },
+        { c1: [.06726, .61330], c2: [.16858, .67401], to: [.20, .57] },
+        // Curva de média que prepara a Reta Oposta.
+        { c1: [.23142, .46599], c2: [.12528, .37563], to: [.17, .28] },
+        // Reta Oposta longa e levemente diagonal.
+        { c1: [.21472, .18437], c2: [.67318, .08945], to: [.76, .12] },
+        // Descida do Lago: contorno externo amplo e progressivo.
+        { c1: [.84682, .15055], c2: [.92938, .21748], to: [.94, .32] },
+        { c1: [.95062, .42252], c2: [.90580, .50319], to: [.84, .53] },
+        // Ferradura: o ponto mais apertado e lento da volta.
+        { c1: [.77420, .55681], c2: [.72381, .33803], to: [.65625, .40476] },
+        { c1: [.58869, .47150], c2: [.72046, .66252], to: [.65625, .73810] },
+        // Laranja, Pinheirinho e Bico de Pato em sequência fluida.
+        { c1: [.59204, .81367], c2: [.54094, .65151], to: [.46, .66] },
+        { c1: [.37906, .66849], c2: [.27672, .65506], to: [.27, .78] },
+        { c1: [.26328, .90494], c2: [.39538, .94222], to: [.48, .97905] },
+        { c1: [.56462, 1.01588], c2: [.62743, .98707], to: [.70, .97905] },
+        { c1: [.77257, .97103], c2: [.84514, .84172], to: [.88, .93905] },
+        // Curva do Sol: arco largo que devolve os carros à reta principal.
+        { c1: [.91486, 1.03637], c2: [.82653, 1.10290], to: [.76, 1.14905] }
       ];
 
       function cubicPoint(p0, p1, p2, p3, t) {
@@ -2153,7 +2465,7 @@
         const t2 = t * t;
         return {
           x: inverse2 * inverse * p0.x + 3 * inverse2 * t * p1.x + 3 * inverse * t2 * p2.x + t2 * t * p3.x,
-          y: inverse2 * inverse * p0.y + 3 * inverse2 * t * p1.y + 3 * inverse * t2 * p2.y + t2 * t * p3.y
+          z: inverse2 * inverse * p0.z + 3 * inverse2 * t * p1.z + 3 * inverse * t2 * p2.z + t2 * t * p3.z
         };
       }
 
@@ -2161,47 +2473,185 @@
         const inverse = 1 - t;
         return {
           x: 3 * inverse * inverse * (p1.x - p0.x) + 6 * inverse * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x),
-          y: 3 * inverse * inverse * (p1.y - p0.y) + 6 * inverse * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y)
+          z: 3 * inverse * inverse * (p1.z - p0.z) + 6 * inverse * t * (p2.z - p1.z) + 3 * t * t * (p3.z - p2.z)
         };
       }
 
-      function buildCircuitGeometry(width, height) {
-        const horizontalMargin = width < 620 ? 18 : 34;
-        const top = height * 0.13;
-        const bottom = height - 22;
-        const usableWidth = width - horizontalMargin * 2;
-        const usableHeight = bottom - top;
-        const mapPoint = ([x, y]) => ({
-          x: horizontalMargin + x * usableWidth,
-          y: top + y * usableHeight
-        });
+      function pointToSegmentDistance(point, start, end) {
+        const deltaX = end.x - start.x;
+        const deltaZ = end.z - start.z;
+        const lengthSquared = deltaX * deltaX + deltaZ * deltaZ;
+        if (lengthSquared < 1e-9) return Math.hypot(point.x - start.x, point.z - start.z);
+        const projection = clamp(
+          ((point.x - start.x) * deltaX + (point.z - start.z) * deltaZ) / lengthSquared,
+          0,
+          1
+        );
+        return Math.hypot(
+          point.x - (start.x + deltaX * projection),
+          point.z - (start.z + deltaZ * projection)
+        );
+      }
 
+      function orientation(a, b, c) {
+        return (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
+      }
+
+      function pointIsOnSegment(point, start, end, epsilon = 1e-7) {
+        return Math.abs(orientation(start, end, point)) <= epsilon &&
+          point.x >= Math.min(start.x, end.x) - epsilon &&
+          point.x <= Math.max(start.x, end.x) + epsilon &&
+          point.z >= Math.min(start.z, end.z) - epsilon &&
+          point.z <= Math.max(start.z, end.z) + epsilon;
+      }
+
+      function lineSegmentsIntersect(a, b, c, d) {
+        const abC = orientation(a, b, c);
+        const abD = orientation(a, b, d);
+        const cdA = orientation(c, d, a);
+        const cdB = orientation(c, d, b);
+        if (abC * abD < 0 && cdA * cdB < 0) return true;
+        return pointIsOnSegment(c, a, b) ||
+          pointIsOnSegment(d, a, b) ||
+          pointIsOnSegment(a, c, d) ||
+          pointIsOnSegment(b, c, d);
+      }
+
+      function lineSegmentDistance(a, b, c, d) {
+        if (lineSegmentsIntersect(a, b, c, d)) return 0;
+        return Math.min(
+          pointToSegmentDistance(a, c, d),
+          pointToSegmentDistance(b, c, d),
+          pointToSegmentDistance(c, a, b),
+          pointToSegmentDistance(d, a, b)
+        );
+      }
+
+      // Regra estrutural: setores independentes precisam comportar asfalto, zebras,
+      // escape e margem de segurança sem que as respectivas superfícies se encontrem.
+      function validateCircuitSpacing(samples, minimumClearance = MIN_TRACK_CLEARANCE) {
+        const sampledSegments = samples.slice(0, -1).map((sample, index) => ({
+          start: sample,
+          end: samples[index + 1],
+          logicalSegment: samples[index + 1].segmentIndex
+        }));
+        const logicalSegmentCount = CIRCUIT_SEGMENTS.length;
+        const violations = [];
+        let closestDistance = Infinity;
+
+        for (let firstIndex = 0; firstIndex < sampledSegments.length; firstIndex += 1) {
+          const first = sampledSegments[firstIndex];
+          for (let secondIndex = firstIndex + 1; secondIndex < sampledSegments.length; secondIndex += 1) {
+            const second = sampledSegments[secondIndex];
+            const rawGap = Math.abs(first.logicalSegment - second.logicalSegment);
+            const circularGap = Math.min(rawGap, logicalSegmentCount - rawGap);
+            if (circularGap <= 1) continue;
+
+            const distance = lineSegmentDistance(first.start, first.end, second.start, second.end);
+            closestDistance = Math.min(closestDistance, distance);
+            if (distance < minimumClearance) {
+              violations.push({
+                firstSegment: first.logicalSegment,
+                secondSegment: second.logicalSegment,
+                distance
+              });
+            }
+          }
+        }
+
+        return {
+          valid: violations.length === 0,
+          minimumClearance,
+          closestDistance,
+          violations
+        };
+      }
+
+      // A distância entre linhas centrais não detecta uma dobra muito apertada na
+      // própria faixa. Esta segunda validação constrói as duas bordas reais do
+      // asfalto e procura interseções entre todos os trechos que não são vizinhos.
+      function validateRibbonTopology(samples, width = TRACK_WIDTH) {
+        const boundaries = samples.map((sample) => {
+          const normalX = -Math.sin(sample.angle);
+          const normalZ = Math.cos(sample.angle);
+          return {
+            left: {
+              x: sample.x + normalX * width / 2,
+              z: sample.z + normalZ * width / 2
+            },
+            right: {
+              x: sample.x - normalX * width / 2,
+              z: sample.z - normalZ * width / 2
+            }
+          };
+        });
+        const segmentCount = boundaries.length - 1;
+        const violations = [];
+        let intersectionCount = 0;
+
+        for (let firstIndex = 0; firstIndex < segmentCount; firstIndex += 1) {
+          for (let secondIndex = firstIndex + 1; secondIndex < segmentCount; secondIndex += 1) {
+            const rawGap = Math.abs(firstIndex - secondIndex);
+            const circularGap = Math.min(rawGap, segmentCount - rawGap);
+            if (circularGap <= 2) continue;
+
+            const first = boundaries[firstIndex];
+            const firstNext = boundaries[firstIndex + 1];
+            const second = boundaries[secondIndex];
+            const secondNext = boundaries[secondIndex + 1];
+            const edgePairs = [
+              ['left', 'left'],
+              ['left', 'right'],
+              ['right', 'left'],
+              ['right', 'right']
+            ];
+
+            edgePairs.forEach(([firstEdge, secondEdge]) => {
+              if (!lineSegmentsIntersect(
+                first[firstEdge],
+                firstNext[firstEdge],
+                second[secondEdge],
+                secondNext[secondEdge]
+              )) return;
+              intersectionCount += 1;
+              if (violations.length < 12) {
+                violations.push({ firstIndex, secondIndex, firstEdge, secondEdge });
+              }
+            });
+          }
+        }
+
+        return {
+          valid: intersectionCount === 0,
+          intersectionCount,
+          violations
+        };
+      }
+
+      function buildCircuitGeometry() {
+        const mapPoint = ([x, z]) => ({ x: (x - 0.5) * 64, z: (z - 0.5) * 42 });
         const segments = [];
         let current = mapPoint(CIRCUIT_SEGMENTS[0].from);
-        const path = new Path2D();
-        path.moveTo(current.x, current.y);
         CIRCUIT_SEGMENTS.forEach((segment) => {
           const c1 = mapPoint(segment.c1);
           const c2 = mapPoint(segment.c2);
           const to = mapPoint(segment.to);
           segments.push({ from: current, c1, c2, to });
-          path.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, to.x, to.y);
           current = to;
         });
-        path.closePath();
 
         const samples = [];
         let trackLength = 0;
         let previous = null;
         segments.forEach((segment, segmentIndex) => {
-          for (let step = segmentIndex === 0 ? 0 : 1; step <= 36; step += 1) {
-            const t = step / 36;
+          for (let step = segmentIndex === 0 ? 0 : 1; step <= 40; step += 1) {
+            const t = step / 40;
             const point = cubicPoint(segment.from, segment.c1, segment.c2, segment.to, t);
             const tangent = cubicTangent(segment.from, segment.c1, segment.c2, segment.to, t);
-            if (previous) trackLength += Math.hypot(point.x - previous.x, point.y - previous.y);
+            if (previous) trackLength += Math.hypot(point.x - previous.x, point.z - previous.z);
             const sample = {
               ...point,
-              angle: Math.atan2(tangent.y, tangent.x),
+              angle: Math.atan2(tangent.z, tangent.x),
               distance: trackLength,
               segmentIndex,
               cornerSeverity: 0,
@@ -2232,7 +2682,32 @@
           index === 0 || apex.distance - list[index - 1].distance > trackLength * 0.035
         ));
 
-        return { path, samples, trackLength, apexes };
+        const bounds = samples.reduce((result, sample) => ({
+          minX: Math.min(result.minX, sample.x),
+          maxX: Math.max(result.maxX, sample.x),
+          minZ: Math.min(result.minZ, sample.z),
+          maxZ: Math.max(result.maxZ, sample.z)
+        }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+
+        const spacingReport = validateCircuitSpacing(samples);
+        if (!spacingReport.valid) {
+          const firstViolation = spacingReport.violations[0];
+          throw new Error(
+            `Circuito inválido: setores ${firstViolation.firstSegment} e ${firstViolation.secondSegment} ` +
+            `estão a ${firstViolation.distance.toFixed(2)}u; mínimo ${spacingReport.minimumClearance.toFixed(2)}u.`
+          );
+        }
+
+        const topologyReport = validateRibbonTopology(samples);
+        if (!topologyReport.valid) {
+          const firstViolation = topologyReport.violations[0];
+          throw new Error(
+            `Malha inválida: as bordas do asfalto se cruzam entre as amostras ` +
+            `${firstViolation.firstIndex} e ${firstViolation.secondIndex}.`
+          );
+        }
+
+        return { samples, trackLength, apexes, bounds, spacingReport, topologyReport };
       }
 
       function getCircuitPositionAtViewDistance(distance, lateralOffset = 0) {
@@ -2251,204 +2726,1673 @@
         const ratio = clamp((localDistance - before.distance) / span, 0, 1);
         const angle = before.angle + normalizeAngle(after.angle - before.angle) * ratio;
         const normalX = -Math.sin(angle);
-        const normalY = Math.cos(angle);
+        const normalZ = Math.cos(angle);
         const x = lerp(before.x, after.x, ratio);
-        const y = lerp(before.y, after.y, ratio);
+        const z = lerp(before.z, after.z, ratio);
         return {
           x: x + normalX * lateralOffset,
-          y: y + normalY * lateralOffset,
+          y: 0,
+          z: z + normalZ * lateralOffset,
           angle,
           normalX,
-          normalY,
+          normalZ,
           cornerSeverity: lerp(before.cornerSeverity, after.cornerSeverity, ratio),
-          turnSign: Math.abs(ratio - 1) < 0.5 ? after.turnSign : before.turnSign
+          turnSign: ratio > 0.5 ? after.turnSign : before.turnSign
         };
       }
 
-      // API física da pista: recebe unidades lógicas acumuladas. Uma volta vale
-      // 1000 unidades, independentemente do tamanho do Canvas ou do devicePixelRatio.
+      // Contrato preservado: distância lógica acumulada entra, pose contínua sai.
       function getPositionAtDistance(distance, lateralOffset = 0) {
         const viewDistance = distance / LOGICAL_LAP_LENGTH * state.view.trackLength;
         return getCircuitPositionAtViewDistance(viewDistance, lateralOffset);
       }
 
-      function buildSampledCircuitPath(lateralOffset = 0) {
-        const path = new Path2D();
-        state.view.pathSamples.forEach((sample, index) => {
+      function createRibbonGeometry(samples, width, elevation = 0.055) {
+        const positions = [];
+        const indices = [];
+        samples.forEach((sample) => {
           const normalX = -Math.sin(sample.angle);
-          const normalY = Math.cos(sample.angle);
-          const x = sample.x + normalX * lateralOffset;
-          const y = sample.y + normalY * lateralOffset;
-          if (index === 0) path.moveTo(x, y);
-          else path.lineTo(x, y);
+          const normalZ = Math.cos(sample.angle);
+          positions.push(
+            sample.x + normalX * width / 2, elevation, sample.z + normalZ * width / 2,
+            sample.x - normalX * width / 2, elevation, sample.z - normalZ * width / 2
+          );
         });
-        path.closePath();
-        return path;
+        for (let index = 0; index < samples.length - 1; index += 1) {
+          const base = index * 2;
+          indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return geometry;
       }
 
-      function drawTrack() {
-        const { width, height, centerY, trackWidth, circuitPath, apexes } = state.view;
-        ctx.fillStyle = '#080c11';
-        ctx.fillRect(0, 0, width, height);
+      function createTrackRunoff() {
+        const runoff = new THREE.Mesh(
+          createRibbonGeometry(state.view.pathSamples, TRACK_SURFACE_WIDTH, 0.012),
+          new THREE.MeshStandardMaterial({
+            color: 0xd8bd7b,
+            roughness: 1,
+            metalness: 0,
+            flatShading: true,
+            side: THREE.DoubleSide
+          })
+        );
+        runoff.receiveShadow = true;
+        scene.add(runoff);
+      }
 
-        const glow = ctx.createRadialGradient(width / 2, centerY, 0, width / 2, centerY, width * 0.62);
-        glow.addColorStop(0, 'rgba(47, 140, 255, 0.035)');
-        glow.addColorStop(0.45, 'rgba(180, 92, 255, 0.015)');
-        glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(0, 0, width, height);
+      function createTrackCurbs() {
+        const curbMaterials = [
+          new THREE.MeshStandardMaterial({ color: 0xf6f4ed, roughness: 0.9, flatShading: true }),
+          new THREE.MeshStandardMaterial({ color: 0xd9343a, roughness: 0.86, flatShading: true })
+        ];
+        const curbGeometry = new THREE.BoxGeometry(0.72, 0.045, TRACK_CURB_WIDTH);
+        const curbMatrices = [[], []];
+        const transform = new THREE.Object3D();
 
-        ctx.lineWidth = 1;
-        for (let x = 0; x < width; x += 44) {
-          ctx.strokeStyle = 'rgba(255,255,255,0.027)';
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, height);
-          ctx.stroke();
-        }
-        for (let y = 0; y < height; y += 44) {
-          ctx.strokeStyle = 'rgba(255,255,255,0.022)';
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(width, y);
-          ctx.stroke();
-        }
-
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = 'rgba(0, 0, 0, .72)';
-        ctx.lineWidth = trackWidth + 14;
-        ctx.stroke(circuitPath);
-        ctx.strokeStyle = '#151b22';
-        ctx.lineWidth = trackWidth;
-        ctx.stroke(circuitPath);
-        ctx.strokeStyle = 'rgba(255,255,255,.026)';
-        ctx.lineWidth = trackWidth - 10;
-        ctx.stroke(circuitPath);
-
-        [-trackWidth / 2 + 4, trackWidth / 2 - 4].forEach((offset) => {
-          ctx.strokeStyle = 'rgba(255,255,255,.18)';
-          ctx.lineWidth = 1.2;
-          ctx.stroke(buildSampledCircuitPath(offset));
+        [-1, 1].forEach((edge, edgeIndex) => {
+          const lateralOffset = edge * (state.view.trackWidth / 2 + TRACK_CURB_WIDTH / 2);
+          state.view.pathSamples.forEach((sample, index) => {
+            if (index >= state.view.pathSamples.length - 1 || index % 3 !== 0) return;
+            const normalX = -Math.sin(sample.angle);
+            const normalZ = Math.cos(sample.angle);
+            const materialIndex = (Math.floor(index / 3) + edgeIndex) % curbMaterials.length;
+            transform.position.set(
+              sample.x + normalX * lateralOffset,
+              0.07,
+              sample.z + normalZ * lateralOffset
+            );
+            transform.rotation.set(0, -sample.angle, 0);
+            transform.updateMatrix();
+            curbMatrices[materialIndex].push(transform.matrix.clone());
+          });
         });
 
-        // Zebras somente nos ápices detectados pelas maiores curvaturas.
-        apexes.forEach((apex) => {
-          const logicalApex = apex.distance / state.view.trackLength * LOGICAL_LAP_LENGTH;
-          for (let stripe = -2; stripe <= 2; stripe += 1) {
-            const curb = getPositionAtDistance(logicalApex + stripe * 8, apex.turnSign * trackWidth / 2);
-            ctx.save();
-            ctx.translate(curb.x, curb.y);
-            ctx.rotate(curb.angle);
-            ctx.fillStyle = stripe % 2 === 0 ? '#f5f7fa' : '#e33d50';
-            ctx.fillRect(-5.5, -3.5, 11, 7);
-            ctx.restore();
+        curbMatrices.forEach((matrices, materialIndex) => {
+          const curbs = new THREE.InstancedMesh(curbGeometry, curbMaterials[materialIndex], matrices.length);
+          matrices.forEach((matrix, index) => curbs.setMatrixAt(index, matrix));
+          curbs.instanceMatrix.needsUpdate = true;
+          curbs.receiveShadow = true;
+          scene.add(curbs);
+        });
+      }
+
+      function createTireBarrier(distance, lateralOffset, accentColor) {
+        const side = Math.sign(lateralOffset) || 1;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          Math.abs(lateralOffset),
+          { length: 2.35, depth: 0.86 },
+          'barreira de pneus'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+
+        const tireMaterials = [
+          new THREE.MeshStandardMaterial({ color: 0x27313a, roughness: 0.95, flatShading: true }),
+          new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.82, flatShading: true }),
+          new THREE.MeshStandardMaterial({ color: 0xf6f2e7, roughness: 0.86, flatShading: true })
+        ];
+        const tireGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.16, 10);
+
+        for (let column = 0; column < 5; column += 1) {
+          for (let layer = 0; layer < 3; layer += 1) {
+            const tire = new THREE.Mesh(tireGeometry, tireMaterials[(column + layer) % tireMaterials.length]);
+            tire.position.set((column - 2) * 0.39, 0.1 + layer * 0.15, (column % 2) * 0.18);
+            tire.castShadow = true;
+            tire.receiveShadow = true;
+            group.add(tire);
+          }
+        }
+        scene.add(group);
+      }
+
+      function createPond() {
+        const placement = findSafeWorldPropPose(0, 0, { length: 5.5, depth: 3.6 }, 'lago');
+        if (!placement) return;
+        const pose = placement.pose;
+        const sand = new THREE.Mesh(
+          new THREE.CircleGeometry(2.65, 28),
+          new THREE.MeshStandardMaterial({ color: 0xe7cf91, roughness: 0.92, flatShading: true })
+        );
+        sand.rotation.x = -Math.PI / 2;
+        sand.scale.set(1, 0.62, 1);
+        sand.position.set(pose.x, -0.052, pose.z);
+        sand.receiveShadow = true;
+        scene.add(sand);
+
+        const water = new THREE.Mesh(
+          new THREE.CircleGeometry(2.28, 28),
+          new THREE.MeshStandardMaterial({ color: 0x43b9df, roughness: 0.34, metalness: 0.08, flatShading: true })
+        );
+        water.rotation.x = -Math.PI / 2;
+        water.scale.set(1, 0.58, 1);
+        water.position.set(pose.x, -0.042, pose.z);
+        water.receiveShadow = true;
+        scene.add(water);
+      }
+
+      function createGrandstand(distance, lateralOffset, seatColors) {
+        const side = Math.sign(lateralOffset) || 1;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          Math.abs(lateralOffset),
+          {
+            length: 5.4,
+            depth: 2.7,
+            offsetLateral: side * 0.94
+          },
+          'arquibancada'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+
+        const structureMaterial = new THREE.MeshStandardMaterial({
+          color: 0x69737d,
+          roughness: 0.9,
+          flatShading: true
+        });
+        const seatMaterials = seatColors.map((color) => new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.84,
+          flatShading: true
+        }));
+
+        for (let tier = 0; tier < 5; tier += 1) {
+          const step = new THREE.Mesh(
+            new THREE.BoxGeometry(5.2, 0.22, 0.74),
+            structureMaterial
+          );
+          step.position.set(0, 0.14 + tier * 0.24, side * tier * 0.47);
+          group.add(step);
+
+          const seats = new THREE.Mesh(
+            new THREE.BoxGeometry(4.9, 0.12, 0.5),
+            seatMaterials[tier % seatMaterials.length]
+          );
+          seats.position.set(0, 0.3 + tier * 0.24, side * tier * 0.47);
+          group.add(seats);
+
+          // Pequenos blocos coloridos sugerem uma arquibancada cheia sem
+          // adicionar modelos individuais ou texturas pesadas.
+          for (let spectator = 0; spectator < 10; spectator += 1) {
+            const crowd = new THREE.Mesh(
+              new THREE.BoxGeometry(0.16, 0.18, 0.14),
+              seatMaterials[(tier + spectator + 1) % seatMaterials.length]
+            );
+            crowd.position.set(
+              -2.18 + spectator * 0.485,
+              0.46 + tier * 0.24 + (spectator % 3) * 0.025,
+              side * (tier * 0.47 - 0.02)
+            );
+            group.add(crowd);
+          }
+        }
+
+        detailStand(group, side, structureMaterial);
+        [-1.9, 1.9].forEach((x) => {
+          const support = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 1.25, 0.2),
+            structureMaterial
+          );
+          support.position.set(x, 0.62, side * 0.9);
+          group.add(support);
+        });
+
+        group.traverse((child) => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        scene.add(group);
+      }
+
+      function createGrassPattern() {
+        const stripeMaterials = [0x76b65b, 0x84c567].map((color) => new THREE.MeshStandardMaterial({
+          color,
+          roughness: 1,
+          metalness: 0,
+          flatShading: true
+        }));
+        const stripeDepth = GROUND_DEPTH / 12;
+        for (let stripe = 0; stripe < 12; stripe += 1) {
+          const patch = new THREE.Mesh(
+            new THREE.PlaneGeometry(GROUND_WIDTH, stripeDepth + 0.02),
+            stripeMaterials[stripe % stripeMaterials.length]
+          );
+          patch.rotation.x = -Math.PI / 2;
+          patch.position.set(0, -0.074, -GROUND_DEPTH / 2 + stripeDepth * (stripe + 0.5));
+          patch.receiveShadow = true;
+          patch.userData.surface = "grass";
+        scene.add(patch);
+        }
+      }
+
+      function getPropFootprint(pose, footprint) {
+        const tangentX = Math.cos(pose.angle);
+        const tangentZ = Math.sin(pose.angle);
+        const normalX = pose.normalX;
+        const normalZ = pose.normalZ;
+        const centerX = pose.x + tangentX * (footprint.offsetForward || 0) + normalX * (footprint.offsetLateral || 0);
+        const centerZ = pose.z + tangentZ * (footprint.offsetForward || 0) + normalZ * (footprint.offsetLateral || 0);
+        const halfLength = footprint.length / 2;
+        const halfDepth = footprint.depth / 2;
+        const corners = [
+          [-halfLength, -halfDepth],
+          [halfLength, -halfDepth],
+          [halfLength, halfDepth],
+          [-halfLength, halfDepth]
+        ].map(([forward, lateral]) => ({
+          x: centerX + tangentX * forward + normalX * lateral,
+          z: centerZ + tangentZ * forward + normalZ * lateral
+        }));
+        return { centerX, centerZ, tangentX, tangentZ, normalX, normalZ, halfLength, halfDepth, corners };
+      }
+
+      function pointInsidePropFootprint(point, footprint) {
+        const deltaX = point.x - footprint.centerX;
+        const deltaZ = point.z - footprint.centerZ;
+        const localForward = deltaX * footprint.tangentX + deltaZ * footprint.tangentZ;
+        const localLateral = deltaX * footprint.normalX + deltaZ * footprint.normalZ;
+        return Math.abs(localForward) <= footprint.halfLength && Math.abs(localLateral) <= footprint.halfDepth;
+      }
+
+      function distanceFromFootprintToTrack(footprint) {
+        let minimumDistance = Infinity;
+        const edges = footprint.corners.map((corner, index) => [
+          corner,
+          footprint.corners[(index + 1) % footprint.corners.length]
+        ]);
+        for (let index = 0; index < state.view.pathSamples.length - 1; index += 1) {
+          const trackStart = state.view.pathSamples[index];
+          const trackEnd = state.view.pathSamples[index + 1];
+          if (pointInsidePropFootprint(trackStart, footprint) || pointInsidePropFootprint(trackEnd, footprint)) return 0;
+          edges.forEach(([edgeStart, edgeEnd]) => {
+            minimumDistance = Math.min(
+              minimumDistance,
+              lineSegmentDistance(trackStart, trackEnd, edgeStart, edgeEnd)
+            );
+          });
+          if (minimumDistance === 0) return 0;
+        }
+        return minimumDistance;
+      }
+
+      function footprintFitsGround(footprint) {
+        return footprint.corners.every((corner) => (
+          Math.abs(corner.x) <= GROUND_WIDTH / 2 - 1 &&
+          Math.abs(corner.z) <= GROUND_DEPTH / 2 - 1
+        ));
+      }
+
+      function distanceBetweenPropFootprints(first, second) {
+        if (
+          first.corners.some((corner) => pointInsidePropFootprint(corner, second)) ||
+          second.corners.some((corner) => pointInsidePropFootprint(corner, first))
+        ) return 0;
+
+        const firstEdges = first.corners.map((corner, index) => [
+          corner,
+          first.corners[(index + 1) % first.corners.length]
+        ]);
+        const secondEdges = second.corners.map((corner, index) => [
+          corner,
+          second.corners[(index + 1) % second.corners.length]
+        ]);
+        let minimumDistance = Infinity;
+        firstEdges.forEach(([firstStart, firstEnd]) => {
+          secondEdges.forEach(([secondStart, secondEnd]) => {
+            minimumDistance = Math.min(
+              minimumDistance,
+              lineSegmentDistance(firstStart, firstEnd, secondStart, secondEnd)
+            );
+          });
+        });
+        return minimumDistance;
+      }
+
+      function findPropCollision(footprint, clearance = MIN_PROP_CLEARANCE) {
+        for (const occupied of occupiedPropFootprints) {
+          const requiredClearance = Math.max(clearance, occupied.clearance);
+          const distance = distanceBetweenPropFootprints(footprint, occupied.footprint);
+          if (distance < requiredClearance) {
+            return { label: occupied.label, distance, requiredClearance };
+          }
+        }
+        return null;
+      }
+
+      function reservePropFootprint(label, footprint, footprintSpec) {
+        if (footprintSpec.reserve === false) return;
+        occupiedPropFootprints.push({
+          label,
+          footprint,
+          clearance: footprintSpec.propClearance ?? MIN_PROP_CLEARANCE
+        });
+      }
+
+      function findTrackSafePropPose(distance, side, preferredOffset, footprintSpec, label) {
+        const requiredClearance = TRACK_SURFACE_WIDTH / 2 + 0.62;
+        const startingOffset = Math.max(preferredOffset, TRACK_SURFACE_WIDTH / 2 + 0.8);
+        const maximumAttempts = 24;
+        for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+          const extra = attempt * 0.45;
+          const pose = getPositionAtDistance(distance, side * (startingOffset + extra));
+          const footprint = getPropFootprint(pose, footprintSpec);
+          const clearance = distanceFromFootprintToTrack(footprint);
+          const propCollision = footprintSpec.reserve === false ? null : findPropCollision(
+            footprint,
+            footprintSpec.propClearance ?? MIN_PROP_CLEARANCE
+          );
+          if (clearance < requiredClearance || !footprintFitsGround(footprint) || propCollision) continue;
+          propPlacementReport.push({ label, clearance, requiredClearance });
+          reservePropFootprint(label, footprint, footprintSpec);
+          return { pose, footprint, clearance };
+        }
+        console.warn(`Prop opcional ignorado após ${maximumAttempts} tentativas seguras: ${label}`);
+        return null;
+      }
+
+      function findSafeWorldPropPose(x, z, footprintSpec, label, angle = 0) {
+        const requiredClearance = TRACK_SURFACE_WIDTH / 2 + 0.62;
+        const maximumAttempts = footprintSpec.reserve === false ? 1 : 24;
+        for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+          const searchRadius = attempt === 0 ? 0 : 0.72 + Math.ceil(attempt / 6) * 0.72;
+          const searchAngle = attempt * 2.399963229728653;
+          const pose = {
+            x: x + Math.cos(searchAngle) * searchRadius,
+            y: 0,
+            z: z + Math.sin(searchAngle) * searchRadius,
+            angle,
+            normalX: -Math.sin(angle),
+            normalZ: Math.cos(angle)
+          };
+          const footprint = getPropFootprint(pose, footprintSpec);
+          const clearance = distanceFromFootprintToTrack(footprint);
+          const propCollision = footprintSpec.reserve === false ? null : findPropCollision(
+            footprint,
+            footprintSpec.propClearance ?? MIN_PROP_CLEARANCE
+          );
+          if (clearance < requiredClearance || !footprintFitsGround(footprint) || propCollision) continue;
+          propPlacementReport.push({ label, clearance, requiredClearance });
+          reservePropFootprint(label, footprint, footprintSpec);
+          return { pose, footprint, clearance };
+        }
+        console.warn(`Prop de terreno ignorado após ${maximumAttempts} tentativas seguras: ${label}`);
+        return null;
+      }
+
+      function validateEnvironmentPlacements() {
+        const invalid = propPlacementReport.filter((placement) => placement.clearance < placement.requiredClearance);
+        if (invalid.length) {
+          console.warn(`Prop opcional removido da área protegida: ${invalid[0].label}`);
+        }
+        for (let firstIndex = 0; firstIndex < occupiedPropFootprints.length; firstIndex += 1) {
+          for (let secondIndex = firstIndex + 1; secondIndex < occupiedPropFootprints.length; secondIndex += 1) {
+            const first = occupiedPropFootprints[firstIndex];
+            const second = occupiedPropFootprints[secondIndex];
+            const distance = distanceBetweenPropFootprints(first.footprint, second.footprint);
+            if (distance < Math.max(first.clearance, second.clearance)) {
+              console.warn(`Conflito residual de cenário: ${first.label} / ${second.label}`);
+              return;
+            }
+          }
+        }
+      }
+
+      function addOptionalEnvironmentProp(label, factory) {
+        try {
+          factory();
+        } catch (error) {
+          console.warn(`Falha isolada no cenário opcional (${label}).`, error);
+        }
+      }
+
+      function createTreeModel(pose, variant = 0) {
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.17, 0.82, 7),
+          new THREE.MeshStandardMaterial({ color: 0x81543b, roughness: 1, flatShading: true })
+        );
+        trunk.position.y = 0.41;
+        group.add(trunk);
+
+        const foliageColors = [0x2f8f49, 0x3c9d51, 0x277d43];
+        const foliageMaterial = new THREE.MeshStandardMaterial({
+          color: foliageColors[variant % foliageColors.length],
+          roughness: 0.96,
+          flatShading: true
+        });
+        if (variant % 3 === 2) {
+          const bush = new THREE.Mesh(new THREE.SphereGeometry(0.72, 8, 5), foliageMaterial);
+          bush.scale.set(1.25, 0.7, 1);
+          bush.position.y = 0.72;
+          group.add(bush);
+        } else {
+          const crown = new THREE.Mesh(new THREE.ConeGeometry(0.78, 1.75, 8), foliageMaterial);
+          crown.position.y = 1.48;
+          group.add(crown);
+          const upperCrown = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.25, 8), foliageMaterial);
+          upperCrown.position.y = 2.14;
+          group.add(upperCrown);
+        }
+
+        group.rotation.y = variant * 0.73;
+        group.scale.setScalar(0.84 + (variant % 4) * 0.08);
+        group.traverse((child) => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        scene.add(group);
+      }
+
+      function createTree(distance, side, preferredOffset, variant = 0) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          preferredOffset,
+          { length: 2.1, depth: 2.1 },
+          'árvore/arbusto'
+        );
+        if (!placement) return;
+        createTreeModel(placement.pose, variant);
+      }
+
+      function createWorldTree(x, z, variant = 0) {
+        const placement = findSafeWorldPropPose(x, z, { length: 2.1, depth: 2.1 }, 'árvore de bosque');
+        if (!placement) return;
+        createTreeModel(placement.pose, variant);
+      }
+
+      function createTreeClusters() {
+        const clusters = [
+          { section: 0.12, side: -1, count: 4 },
+          { section: 0.29, side: 1, count: 5 },
+          { section: 0.48, side: -1, count: 5 },
+          { section: 0.69, side: 1, count: 4 },
+          { section: 0.84, side: -1, count: 5 }
+        ];
+        clusters.forEach((cluster, clusterIndex) => {
+          for (let index = 0; index < cluster.count; index += 1) {
+            const spread = (index - (cluster.count - 1) / 2) * 0.012;
+            createTree(
+              LOGICAL_LAP_LENGTH * (cluster.section + spread),
+              cluster.side,
+              6.2 + (index % 2) * 1.15,
+              clusterIndex + index
+            );
           }
         });
+      }
 
-        const finish = getPositionAtDistance(0);
-        const checkerSize = 6;
-        const checkerCount = Math.ceil(trackWidth / checkerSize);
-        ctx.save();
-        ctx.translate(finish.x, finish.y);
-        ctx.rotate(finish.angle);
-        for (let row = 0; row < checkerCount; row += 1) {
+      function finalizeEnvironmentGroup(group) {
+        group.traverse((child) => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        scene.add(group);
+      }
+
+      function createRaceControlTower() {
+        // A torre fica no lado externo e adiante da linha de chegada, longe do
+        // foco da câmera de celebração e integralmente depois da área de escape.
+        const distance = LOGICAL_LAP_LENGTH * 0.085;
+        const side = -1;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          7.2,
+          { length: 7.6, depth: 3.1 },
+          'torre de controle'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xf0f3f5, roughness: 0.82, flatShading: true });
+        const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xaeb8c1, roughness: 0.86, flatShading: true });
+        const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x273442, roughness: 0.52, metalness: 0.12, flatShading: true });
+        const lowerBlock = new THREE.Mesh(new THREE.BoxGeometry(7.05, 1.45, 2.7), wallMaterial);
+        lowerBlock.position.y = 0.73;
+        group.add(lowerBlock);
+        const upperBox = new THREE.Mesh(new THREE.BoxGeometry(5.95, 1.35, 2.45), wallMaterial);
+        upperBox.position.set(0.2, 2.05, 0);
+        group.add(upperBox);
+
+        const windowBand = new THREE.Mesh(new THREE.BoxGeometry(5.45, 0.62, 0.09), windowMaterial);
+        windowBand.position.set(0.2, 2.15, -side * 1.25);
+        group.add(windowBand);
+        for (let mullion = 0; mullion < 7; mullion += 1) {
+          const divider = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.65, 0.11), trimMaterial);
+          divider.position.set(-2.36 + mullion * 0.79, 2.15, -side * 1.27);
+          group.add(divider);
+        }
+
+        detailPit(group, side, trimMaterial, windowMaterial);
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(6.55, 0.2, 2.95), wallMaterial);
+        roof.position.set(0.2, 2.82, 0);
+        roof.rotation.x = side * 0.11;
+        group.add(roof);
+
+        const garageColors = [0x2f8cff, 0x3ee6a8, 0xa970ff, 0xff8a3d];
+        for (let garage = 0; garage < 5; garage += 1) {
+          const door = new THREE.Mesh(
+            new THREE.BoxGeometry(1.05, 0.82, 0.08),
+            new THREE.MeshStandardMaterial({ color: garageColors[garage % garageColors.length], roughness: 0.78, flatShading: true })
+          );
+          door.position.set(-2.45 + garage * 1.23, 0.48, -side * 1.38);
+          group.add(door);
+        }
+        const fascia = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.2, 0.1), windowMaterial);
+        fascia.position.set(0, 1.22, -side * 1.4);
+        group.add(fascia);
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createFlagPole(distance, lateralOffset, color, flagDirection = 1) {
+        const side = Math.sign(lateralOffset) || 1;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          Math.abs(lateralOffset),
+          { length: 1.15, depth: 0.24, offsetForward: flagDirection * 0.48 },
+          'mastro de bandeira'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const poleMaterial = new THREE.MeshStandardMaterial({ color: 0xe8edf2, roughness: 0.72, flatShading: true });
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 3.1, 7), poleMaterial);
+        pole.position.y = 1.55;
+        group.add(pole);
+        const flag = new THREE.Mesh(
+          new THREE.BoxGeometry(0.95, 0.48, 0.045),
+          new THREE.MeshStandardMaterial({ color, roughness: 0.7, flatShading: true })
+        );
+        flag.position.set(flagDirection * 0.48, 2.72, 0);
+        group.add(flag);
+        group.traverse((child) => {
+          if (!child.isMesh) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        scene.add(group);
+      }
+
+      function createChainLinkFence(distance, side, length = 4.4) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          5.35,
+          { length: length + 0.3, depth: 0.28 },
+          'cerca metálica'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x7f8b93, roughness: 0.72, metalness: 0.18, flatShading: true });
+        [-length / 2, 0, length / 2].forEach((x) => {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 1.72, 7), frameMaterial);
+          post.position.set(x, 0.86, 0);
+          group.add(post);
+        });
+        [0.22, 1.5].forEach((y) => {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.055, 0.055), frameMaterial);
+          rail.position.set(0, y, 0);
+          group.add(rail);
+        });
+
+        const gridPositions = [];
+        for (let x = -length / 2 + 0.22; x < length / 2; x += 0.42) {
+          gridPositions.push(x, 0.24, 0, x, 1.48, 0);
+        }
+        for (let y = 0.32; y < 1.48; y += 0.28) {
+          gridPositions.push(-length / 2, y, 0, length / 2, y, 0);
+        }
+        const gridGeometry = new THREE.BufferGeometry();
+        gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridPositions, 3));
+        const grid = new THREE.LineSegments(
+          gridGeometry,
+          new THREE.LineBasicMaterial({ color: 0xaab4ba, transparent: true, opacity: 0.72 })
+        );
+        grid.position.z = 0.015;
+        group.add(grid);
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createTrackLight(distance, side) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          5.7,
+          { length: 1.35, depth: 0.82 },
+          'poste de iluminação'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x59656f, roughness: 0.76, metalness: 0.2, flatShading: true });
+        const lampMaterial = new THREE.MeshStandardMaterial({ color: 0xffedb0, emissive: 0xffd76a, emissiveIntensity: 0.35, roughness: 0.55, flatShading: true });
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.065, 3.75, 8), poleMaterial);
+        pole.position.y = 1.88;
+        group.add(pole);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.075, 0.075), poleMaterial);
+        arm.position.set(0.31, 3.67, 0);
+        group.add(arm);
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.24), lampMaterial);
+        lamp.position.set(0.62, 3.58, 0);
+        group.add(lamp);
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createDecorativeBarrier(distance, side, length = 3.3) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          5.65,
+          { length: length + 0.25, depth: 0.58 },
+          'barreira decorativa'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const colors = [0xe94f52, 0xf4f4ef];
+        const count = Math.max(4, Math.round(length / 0.52));
+        const pieceLength = length / count;
+        for (let index = 0; index < count; index += 1) {
+          const segment = new THREE.Mesh(
+            new THREE.BoxGeometry(pieceLength - 0.025, 0.42, 0.36),
+            new THREE.MeshStandardMaterial({ color: colors[index % colors.length], roughness: 0.82, flatShading: true })
+          );
+          segment.position.set(-length / 2 + pieceLength * (index + 0.5), 0.21, 0);
+          group.add(segment);
+        }
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createTimingTower(distance, side) {
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          7.25,
+          { length: 1.5, depth: 0.72 },
+          'torre de cronometragem'
+        );
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const supportMaterial = new THREE.MeshStandardMaterial({ color: 0x65717a, roughness: 0.82, flatShading: true });
+        const screenMaterial = new THREE.MeshStandardMaterial({ color: 0x1f2933, roughness: 0.7, metalness: 0.08, flatShading: true });
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.15, 0.18), supportMaterial);
+        post.position.y = 0.58;
+        group.add(post);
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(1.25, 3.15, 0.28), screenMaterial);
+        panel.position.y = 2.45;
+        group.add(panel);
+
+        const displayColors = [0xff6b5f, 0xffd65a, 0x3ee6a8, 0x2f8cff, 0xa970ff];
+        for (let row = 0; row < 8; row += 1) {
+          for (let column = 0; column < 3; column += 1) {
+            const pixel = new THREE.Mesh(
+              new THREE.BoxGeometry(0.2, 0.16, 0.04),
+              new THREE.MeshBasicMaterial({ color: displayColors[(row + column) % displayColors.length] })
+            );
+            pixel.position.set(-0.3 + column * 0.3, 1.35 + row * 0.29, -side * 0.165);
+            group.add(pixel);
+          }
+        }
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createAdditionalTrees() {
+        [
+          [0.02, 1, 7.1, 7],
+          [0.19, -1, 7.4, 8],
+          [0.42, 1, 7.0, 9],
+          [0.62, -1, 7.5, 10],
+          [0.91, 1, 7.2, 11]
+        ].forEach(([section, side, offset, variant]) => {
+          createTree(LOGICAL_LAP_LENGTH * section, side, offset, variant);
+        });
+      }
+
+      function createDioramaBase() {
+        const soilMaterial = new THREE.MeshStandardMaterial({ color: 0x765343, roughness: 1, flatShading: true });
+        const stoneMaterial = new THREE.MeshStandardMaterial({ color: 0x6d6963, roughness: 0.96, flatShading: true });
+        const base = new THREE.Mesh(new THREE.BoxGeometry(GROUND_WIDTH, 0.95, GROUND_DEPTH), soilMaterial);
+        base.position.y = -0.62;
+        base.castShadow = true;
+        base.receiveShadow = true;
+        scene.add(base);
+
+        const edgeRockGeometry = new THREE.DodecahedronGeometry(0.72, 0);
+        const edgeRocks = new THREE.InstancedMesh(edgeRockGeometry, stoneMaterial, 64);
+        const transform = new THREE.Object3D();
+        const random = mulberry32(hashString('terrain-cliff-edge'));
+        for (let index = 0; index < 64; index += 1) {
+          const edge = index % 4;
+          const progress = Math.floor(index / 4) / 15;
+          const jitter = (random() - 0.5) * 1.1;
+          if (edge === 0 || edge === 1) {
+            transform.position.set(
+              -GROUND_WIDTH / 2 + progress * GROUND_WIDTH,
+              -0.22 - random() * 0.28,
+              (edge === 0 ? -1 : 1) * (GROUND_DEPTH / 2 - 0.25) + jitter
+            );
+          } else {
+            transform.position.set(
+              (edge === 2 ? -1 : 1) * (GROUND_WIDTH / 2 - 0.25) + jitter,
+              -0.22 - random() * 0.28,
+              -GROUND_DEPTH / 2 + progress * GROUND_DEPTH
+            );
+          }
+          transform.rotation.set(random() * 0.55, random() * Math.PI, random() * 0.4);
+          transform.scale.set(1.15 + random() * 0.7, 0.45 + random() * 0.35, 0.75 + random() * 0.45);
+          transform.updateMatrix();
+          edgeRocks.setMatrixAt(index, transform.matrix);
+        }
+        edgeRocks.instanceMatrix.needsUpdate = true;
+        edgeRocks.castShadow = true;
+        edgeRocks.receiveShadow = true;
+        scene.add(edgeRocks);
+      }
+
+      function createTerrainMound(x, z, length, depth, height, rotation = 0, color = 0x6eae54) {
+        const placement = findSafeWorldPropPose(x, z, { length, depth, reserve: false }, 'elevação de terreno', rotation);
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, -0.03, pose.z);
+        group.rotation.y = -rotation;
+        const soil = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.84, 1, 1, 8),
+          new THREE.MeshStandardMaterial({ color: 0x795541, roughness: 1, flatShading: true })
+        );
+        soil.scale.set(length / 2, height, depth / 2);
+        soil.position.y = height / 2;
+        group.add(soil);
+        const top = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.79, 0.84, 0.12, 8),
+          new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true })
+        );
+        top.scale.set(length / 2, 1, depth / 2);
+        top.position.y = height + 0.02;
+        group.add(top);
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createTerrainRelief() {
+        [
+          [-13, 7, 7.2, 5.4, 0.52, 0.12, 0x72b75b],
+          [10, 4, 6.4, 4.8, 0.42, -0.2, 0x78bb5f],
+          [35, 28, 9.2, 6.8, 0.68, 0.18, 0x68a94f],
+          [-34, 27, 8.5, 6.2, 0.58, -0.14, 0x75b75b],
+          [31, -29, 7.8, 5.8, 0.46, 0.08, 0x6cad53],
+          [-28, -28, 8.8, 6.6, 0.62, -0.2, 0x70b457]
+        ].forEach((mound) => createTerrainMound(...mound));
+      }
+
+      function createWaterChannel() {
+        const placement = findSafeWorldPropPose(-43, 0, { length: 8.4, depth: 29 }, 'canal de água');
+        if (!placement) return;
+        const group = new THREE.Group();
+        group.position.set(placement.pose.x, 0, placement.pose.z);
+        const water = new THREE.Mesh(
+          new THREE.PlaneGeometry(6.5, 28),
+          new THREE.MeshStandardMaterial({ color: 0x48b9e4, roughness: 0.34, metalness: 0.06, flatShading: true })
+        );
+        water.rotation.x = -Math.PI / 2;
+        water.position.y = -0.035;
+        water.receiveShadow = true;
+        group.add(water);
+        const bankMaterial = new THREE.MeshStandardMaterial({ color: 0x8b684c, roughness: 1, flatShading: true });
+        [-3.45, 3.45].forEach((x) => {
+          const bank = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.18, 28.4), bankMaterial);
+          bank.position.set(x, -0.02, 0);
+          group.add(bank);
+        });
+        const bridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x6a737a, roughness: 0.86, flatShading: true });
+        const bridge = new THREE.Mesh(new THREE.BoxGeometry(7.7, 0.18, 2.3), bridgeMaterial);
+        bridge.position.set(0, 0.16, -5.6);
+        group.add(bridge);
+        [-1.02, 1.02].forEach((z) => {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(7.7, 0.18, 0.1), bridgeMaterial);
+          rail.position.set(0, 0.48, -5.6 + z);
+          group.add(rail);
+        });
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createParkingLot() {
+        const placement = findSafeWorldPropPose(42, -27, { length: 15.5, depth: 10.8 }, 'estacionamento');
+        if (!placement) return;
+        const group = new THREE.Group();
+        group.position.set(placement.pose.x, 0, placement.pose.z);
+        const asphalt = new THREE.Mesh(
+          new THREE.PlaneGeometry(15, 10.2),
+          new THREE.MeshStandardMaterial({ color: 0x38434c, roughness: 0.94, flatShading: true })
+        );
+        asphalt.rotation.x = -Math.PI / 2;
+        asphalt.position.y = -0.025;
+        asphalt.receiveShadow = true;
+        group.add(asphalt);
+        const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xf1f3ef });
+        for (let row = -1; row <= 1; row += 2) {
+          for (let space = 0; space < 7; space += 1) {
+            const divider = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.025, 3.2), lineMaterial);
+            divider.position.set(-6.1 + space * 2.05, 0.015, row * 2.25);
+            group.add(divider);
+          }
+        }
+        const aisle = new THREE.Mesh(new THREE.BoxGeometry(13.6, 0.025, 0.08), lineMaterial);
+        aisle.position.y = 0.015;
+        group.add(aisle);
+
+        const parkedColors = [0x2f8cff, 0xff8a3d, 0xa970ff];
+        parkedColors.forEach((color, index) => {
+          const parkedCar = new THREE.Mesh(
+            new THREE.BoxGeometry(1.35, 0.34, 0.7),
+            new THREE.MeshStandardMaterial({ color, roughness: 0.8, flatShading: true })
+          );
+          parkedCar.position.set(-4.4 + index * 3.8, 0.18, -2.25);
+          group.add(parkedCar);
+        });
+        [-6.6, 6.6].forEach((x) => {
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.045, 0.065, 3.2, 7),
+            new THREE.MeshStandardMaterial({ color: 0x59656f, roughness: 0.82, flatShading: true })
+          );
+          pole.position.set(x, 1.6, 3.8);
+          group.add(pole);
+          const lamp = new THREE.Mesh(
+            new THREE.BoxGeometry(0.48, 0.16, 0.28),
+            new THREE.MeshStandardMaterial({ color: 0xffedb0, emissive: 0xffd76a, emissiveIntensity: 0.28, flatShading: true })
+          );
+          lamp.position.set(x, 3.08, 3.8);
+          group.add(lamp);
+        });
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createSceneryRock(distance, side, preferredOffset, variant) {
+        const radius = 0.75 + (variant % 3) * 0.18;
+        const placement = findTrackSafePropPose(
+          distance,
+          side,
+          preferredOffset,
+          { length: radius * 2.6, depth: radius * 2.35 },
+          'rocha de cenário'
+        );
+        if (!placement) return;
+        const rock = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(radius, 0),
+          new THREE.MeshStandardMaterial({ color: [0x777b78, 0x686d6b, 0x898780][variant % 3], roughness: 1, flatShading: true })
+        );
+        rock.position.set(placement.pose.x, radius * 0.58, placement.pose.z);
+        rock.rotation.set(variant * 0.21, variant * 0.73, variant * 0.13);
+        rock.scale.set(1.15, 0.72, 0.92);
+        rock.castShadow = true;
+        rock.receiveShadow = true;
+        scene.add(rock);
+      }
+
+      function createRockScatter() {
+        [
+          [0.18, -1, 6.4], [0.27, 1, 6.2], [0.47, -1, 6.7],
+          [0.59, 1, 6.3], [0.71, -1, 6.5], [0.87, 1, 6.8]
+        ].forEach(([section, side, offset], index) => {
+          createSceneryRock(LOGICAL_LAP_LENGTH * section, side, offset, index);
+        });
+      }
+
+      function createDenseForestPatches() {
+        const patches = [
+          { x: -39, z: 27, count: 7 },
+          { x: 42, z: 22, count: 7 },
+          { x: 35, z: -8, count: 5 },
+          { x: -31, z: -29, count: 7 }
+        ];
+        const random = mulberry32(hashString('dense-forest-patches'));
+        patches.forEach((patch, patchIndex) => {
+          for (let index = 0; index < patch.count; index += 1) {
+            const angle = random() * Math.PI * 2;
+            const radius = 1.2 + random() * 4.5;
+            createWorldTree(
+              patch.x + Math.cos(angle) * radius,
+              patch.z + Math.sin(angle) * radius,
+              patchIndex * 5 + index + 12
+            );
+          }
+        });
+      }
+
+      function createWatchtower() {
+        const placement = findSafeWorldPropPose(-42, -30, { length: 4.2, depth: 4.2 }, 'torre de observação');
+        if (!placement) return;
+        const group = new THREE.Group();
+        group.position.set(placement.pose.x, 0, placement.pose.z);
+        const woodMaterial = new THREE.MeshStandardMaterial({ color: 0x79533d, roughness: 0.96, flatShading: true });
+        const cabinMaterial = new THREE.MeshStandardMaterial({ color: 0xe9edf0, roughness: 0.84, flatShading: true });
+        const windowMaterial = new THREE.MeshStandardMaterial({ color: 0x334654, roughness: 0.5, metalness: 0.1, flatShading: true });
+        [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([x, z]) => {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 4.4, 0.18), woodMaterial);
+          leg.position.set(x * 0.78, 2.15, z * 0.78);
+          leg.rotation.z = -x * 0.07;
+          leg.rotation.x = z * 0.07;
+          group.add(leg);
+        });
+        const platform = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.22, 2.7), woodMaterial);
+        platform.position.y = 4.15;
+        group.add(platform);
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.25, 1.35, 2.1), cabinMaterial);
+        cabin.position.y = 4.88;
+        group.add(cabin);
+        const window = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.58, 0.08), windowMaterial);
+        window.position.set(0, 5.02, 1.08);
+        group.add(window);
+        const roof = new THREE.Mesh(
+          new THREE.ConeGeometry(2.05, 0.85, 4),
+          new THREE.MeshStandardMaterial({ color: 0x8e493c, roughness: 0.9, flatShading: true })
+        );
+        roof.position.y = 5.95;
+        roof.rotation.y = Math.PI / 4;
+        group.add(roof);
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createTracksideBillboard() {
+        let selectedSide = 1;
+        let placement = findTrackSafePropPose(
+          LOGICAL_LAP_LENGTH * 0.018,
+          1,
+          8.2,
+          { length: 3.9, depth: 1.05 },
+          'telão da reta principal'
+        );
+        if (!placement) {
+          selectedSide = -1;
+          placement = findTrackSafePropPose(
+            LOGICAL_LAP_LENGTH * 0.018,
+            -1,
+            10.2,
+            { length: 3.9, depth: 1.05 },
+            'telão da reta principal'
+          );
+        }
+        if (!placement) return;
+        const pose = placement.pose;
+        const group = new THREE.Group();
+        group.position.set(pose.x, 0, pose.z);
+        group.rotation.y = -pose.angle;
+        const postMaterial = new THREE.MeshStandardMaterial({ color: 0x59656f, roughness: 0.8, flatShading: true });
+        const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x202a33, roughness: 0.72, flatShading: true });
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.7, 0.2), postMaterial);
+        post.position.y = 1.85;
+        group.add(post);
+        const screen = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.75, 0.28), frameMaterial);
+        screen.position.y = 4.25;
+        group.add(screen);
+        const display = new THREE.Mesh(
+          new THREE.BoxGeometry(3.08, 1.35, 0.04),
+          new THREE.MeshBasicMaterial({ color: 0x2f8cff })
+        );
+        display.position.set(0, 4.25, -selectedSide * 0.165);
+        group.add(display);
+        const accent = new THREE.Mesh(
+          new THREE.BoxGeometry(1.02, 1.35, 0.045),
+          new THREE.MeshBasicMaterial({ color: 0xa970ff })
+        );
+        accent.position.set(1.03, 4.25, display.position.z - 0.005);
+        group.add(accent);
+        finalizeEnvironmentGroup(group);
+      }
+
+      function createEnvironmentProps() {
+        propPlacementReport.length = 0;
+        occupiedPropFootprints.length = 0;
+        const propOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 0.8;
+        const standOffset = state.view.trackWidth / 2 + TRACK_CURB_WIDTH + TRACK_RUNOFF_WIDTH + 3.1;
+        const optionalProps = [
+          ['base elevada do diorama', createDioramaBase],
+          ['relevo do terreno', createTerrainRelief],
+          ['canal e ponte', createWaterChannel],
+          ['estacionamento', createParkingLot],
+          ['torre de observação', createWatchtower],
+          ['telão da reta principal', createTracksideBillboard],
+          ['barreira de pneus 1', () => createTireBarrier(LOGICAL_LAP_LENGTH * 0.25, propOffset, 0xe6425f)],
+          ['barreira de pneus 2', () => createTireBarrier(LOGICAL_LAP_LENGTH * 0.72, -propOffset, 0xf7d14a)],
+          ['arquibancada 1', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.05, -standOffset, [0xe23f48, 0xf2f4f7, 0x2f78d0])],
+          ['arquibancada 2', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.36, standOffset, [0x7748d5, 0xf4ca43, 0xf2f4f7])],
+          ['arquibancada 3', () => createGrandstand(LOGICAL_LAP_LENGTH * 0.56, -standOffset, [0x2f78d0, 0xf2f4f7, 0xe23f48])],
+          ['torre de controle', createRaceControlTower],
+          ['cerca da reta principal', () => createChainLinkFence(LOGICAL_LAP_LENGTH * 0.048, -1, 4.8)],
+          ['cerca da arquibancada oposta', () => createChainLinkFence(LOGICAL_LAP_LENGTH * 0.355, 1, 4.5)],
+          ['cerca da arquibancada interna', () => createChainLinkFence(LOGICAL_LAP_LENGTH * 0.555, -1, 4.3)],
+          ['poste da reta principal 1', () => createTrackLight(LOGICAL_LAP_LENGTH * 0.012, -1)],
+          ['poste da reta principal 2', () => createTrackLight(LOGICAL_LAP_LENGTH * 0.13, -1)],
+          ['poste da reta oposta 1', () => createTrackLight(LOGICAL_LAP_LENGTH * 0.34, 1)],
+          ['poste da reta oposta 2', () => createTrackLight(LOGICAL_LAP_LENGTH * 0.42, 1)],
+          ['barreira decorativa 1', () => createDecorativeBarrier(LOGICAL_LAP_LENGTH * 0.235, 1, 3.4)],
+          ['barreira decorativa 2', () => createDecorativeBarrier(LOGICAL_LAP_LENGTH * 0.515, -1, 3.1)],
+          ['barreira decorativa 3', () => createDecorativeBarrier(LOGICAL_LAP_LENGTH * 0.745, 1, 3.5)],
+          ['torre de cronometragem', () => createTimingTower(LOGICAL_LAP_LENGTH * 0.385, 1)],
+          ['bandeira azul', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.07, -standOffset + 0.6, 0x2f8cff, 1)],
+          ['bandeira laranja', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.075, -standOffset + 0.6, 0xff8a3d, -1)],
+          ['bandeira roxa', () => createFlagPole(LOGICAL_LAP_LENGTH * 0.37, standOffset - 0.4, 0xa970ff, 1)],
+          ['rochas de transição', createRockScatter],
+          ['bosques densos', createDenseForestPatches],
+          ['árvores e arbustos', createTreeClusters],
+          ['árvores adicionais', createAdditionalTrees],
+          ['lago', createPond]
+        ];
+        optionalProps.forEach(([label, factory]) => addOptionalEnvironmentProp(label, factory));
+        addOptionalEnvironmentProp('validação final', validateEnvironmentPlacements);
+      }
+
+      function createTrackScene() {
+        const ground = new THREE.Mesh(
+          new THREE.PlaneGeometry(GROUND_WIDTH, GROUND_DEPTH, 1, 1),
+          new THREE.MeshStandardMaterial({ color: 0x7dbd5f, roughness: 1, metalness: 0, flatShading: true })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.08;
+        ground.receiveShadow = true;
+        ground.userData.surface = "grass";
+        scene.add(ground);
+        // One textured grass surface avoids coplanar stripe/base flicker.
+
+        createTrackRunoff();
+
+        const track = new THREE.Mesh(
+          createRibbonGeometry(state.view.pathSamples, state.view.trackWidth, 0.065),
+          new THREE.MeshStandardMaterial({
+            color: 0x303a45,
+            roughness: 0.88,
+            metalness: 0.06,
+            flatShading: true,
+            side: THREE.DoubleSide
+          })
+        );
+        track.receiveShadow = true;
+        track.userData.surface = "asphalt";
+        scene.add(track);
+
+        createTrackCurbs();
+
+        const finishPose = getPositionAtDistance(0);
+        const checkerSize = state.view.trackWidth / 10;
+        const checkerMaterials = [
+          new THREE.MeshBasicMaterial({ color: 0xf4f7fa }),
+          new THREE.MeshBasicMaterial({ color: 0x1c242d })
+        ];
+        for (let row = 0; row < 10; row += 1) {
           for (let column = 0; column < 2; column += 1) {
-            ctx.fillStyle = (row + column) % 2 === 0 ? '#f5f7fa' : '#222a34';
-            ctx.fillRect(-checkerSize + column * checkerSize, -trackWidth / 2 + row * checkerSize, checkerSize, checkerSize);
+            const lateral = -state.view.trackWidth / 2 + checkerSize * (row + 0.5);
+            const forward = (column - 0.5) * 0.24;
+            const tile = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.045, checkerSize), checkerMaterials[(row + column) % 2]);
+            tile.position.set(
+              finishPose.x + Math.cos(finishPose.angle) * forward + finishPose.normalX * lateral,
+              0.082,
+              finishPose.z + Math.sin(finishPose.angle) * forward + finishPose.normalZ * lateral
+            );
+            tile.rotation.y = -finishPose.angle;
+            tile.receiveShadow = true;
+            scene.add(tile);
           }
         }
-        ctx.restore();
 
       }
 
-      function drawTrail(runner, distance, laneOffset) {
-        const speedRatio = clamp(runner.velocity / 115, 0.25, 2.5);
-        const sprintBoost = runner.sprintTimer > 0 ? 1.75 : 1;
-        const trailLength = clamp(20 + speedRatio * 28 * sprintBoost, 24, 92);
-        const samples = reducedMotion ? 4 : 12;
+      function createConfettiSystem() {
+        const count = 88;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        const points = new THREE.Points(
+          geometry,
+          new THREE.PointsMaterial({
+            size: 0.22,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.96,
+            depthWrite: false,
+            sizeAttenuation: true
+          })
+        );
+        points.visible = false;
+        points.frustumCulled = false;
+        scene.add(points);
+        return {
+          points,
+          positions,
+          colors,
+          velocities: Array.from({ length: count }, () => new THREE.Vector3()),
+          active: false,
+          elapsed: 0,
+          duration: 2.05
+        };
+      }
 
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = `rgba(${runner.rgb}, ${runner.sprintTimer > 0 ? .7 : .34})`;
-        ctx.lineWidth = runner.sprintTimer > 0 ? 5 : 3;
-        ctx.shadowColor = runner.color;
-        ctx.shadowBlur = runner.sprintTimer > 0 ? 24 : 14;
-        ctx.beginPath();
-        for (let index = samples; index >= 0; index -= 1) {
-          const sampleDistance = distance - trailLength * (index / samples);
-          const point = getPositionAtDistance(sampleDistance, laneOffset);
-          if (index === samples) ctx.moveTo(point.x, point.y);
-          else ctx.lineTo(point.x, point.y);
+      function resetConfetti() {
+        if (!confettiSystem) return;
+        confettiSystem.active = false;
+        confettiSystem.elapsed = 0;
+        confettiSystem.points.visible = false;
+      }
+
+      function burstFinishConfetti(winner) {
+        if (!confettiSystem || !winner) return;
+        const finishPose = getPositionAtDistance(0);
+        const palette = RUNNERS.map((runner) => new THREE.Color(runner.color));
+        const random = mulberry32(hashString(`${state.race.seed}:finish-confetti`));
+        for (let index = 0; index < confettiSystem.velocities.length; index += 1) {
+          const laneSpread = (random() - 0.5) * (state.view.trackWidth + 1.6);
+          const forwardSpread = (random() - 0.5) * 1.5;
+          confettiSystem.positions[index * 3] = finishPose.x + finishPose.normalX * laneSpread + Math.cos(finishPose.angle) * forwardSpread;
+          confettiSystem.positions[index * 3 + 1] = 0.35 + random() * 0.55;
+          confettiSystem.positions[index * 3 + 2] = finishPose.z + finishPose.normalZ * laneSpread + Math.sin(finishPose.angle) * forwardSpread;
+
+          const color = palette[(index + winner.id) % palette.length];
+          confettiSystem.colors[index * 3] = color.r;
+          confettiSystem.colors[index * 3 + 1] = color.g;
+          confettiSystem.colors[index * 3 + 2] = color.b;
+
+          const outward = (random() - 0.5) * 3.2;
+          const forward = (random() - 0.5) * 2.4;
+          confettiSystem.velocities[index].set(
+            finishPose.normalX * outward + Math.cos(finishPose.angle) * forward,
+            3.7 + random() * 3.4,
+            finishPose.normalZ * outward + Math.sin(finishPose.angle) * forward
+          );
         }
-        ctx.stroke();
-        ctx.restore();
+        confettiSystem.points.geometry.attributes.position.needsUpdate = true;
+        confettiSystem.points.geometry.attributes.color.needsUpdate = true;
+        confettiSystem.points.material.opacity = 0.96;
+        confettiSystem.elapsed = 0;
+        confettiSystem.active = true;
+        confettiSystem.points.visible = true;
       }
 
-      function drawCar(runner, pose) {
-        const compact = state.view.width < 540;
-        const length = compact ? 24 : 31;
-        const carWidth = compact ? 11 : 14;
-        const flash = runner.stumbleTimer > 0
-          ? (reducedMotion ? 0.62 : 0.38 + 0.62 * Math.abs(Math.sin(state.race.elapsedSim * Math.PI * 1.35)))
-          : 1;
-
-        ctx.save();
-        ctx.translate(pose.x, pose.y);
-        ctx.rotate(pose.angle);
-        ctx.globalAlpha = flash;
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = `rgba(${runner.rgb}, .2)`;
-        ctx.shadowColor = runner.color;
-        ctx.shadowBlur = runner.sprintTimer > 0 ? 30 : 19;
-        ctx.fillRect(-length / 2 - 2, -carWidth / 2 - 2, length + 4, carWidth + 4);
-        ctx.restore();
-
-        ctx.save();
-        ctx.translate(pose.x, pose.y);
-        ctx.rotate(pose.angle);
-        ctx.globalAlpha = flash;
-        const shell = ctx.createLinearGradient(-length / 2, 0, length / 2, 0);
-        shell.addColorStop(0, `rgba(${runner.rgb}, .5)`);
-        shell.addColorStop(.5, runner.color);
-        shell.addColorStop(1, 'rgba(255,255,255,.88)');
-        ctx.fillStyle = shell;
-        ctx.strokeStyle = 'rgba(255,255,255,.56)';
-        ctx.lineWidth = .7;
-
-        // Silhueta F1 top-down: asas largas, sidepods e monocoque estreito.
-        ctx.fillRect(length * .34, -carWidth * .72, length * .12, carWidth * 1.44);
-        ctx.fillRect(-length * .49, -carWidth * .62, length * .13, carWidth * 1.24);
-        ctx.beginPath();
-        ctx.moveTo(length * .48, 0);
-        ctx.lineTo(length * .22, -carWidth * .22);
-        ctx.lineTo(length * .04, -carWidth * .38);
-        ctx.lineTo(-length * .31, -carWidth * .32);
-        ctx.lineTo(-length * .43, -carWidth * .2);
-        ctx.lineTo(-length * .43, carWidth * .2);
-        ctx.lineTo(-length * .31, carWidth * .32);
-        ctx.lineTo(length * .04, carWidth * .38);
-        ctx.lineTo(length * .22, carWidth * .22);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = `rgba(${runner.rgb}, .72)`;
-        ctx.fillRect(-length * .18, -carWidth * .48, length * .23, carWidth * .96);
-        ctx.fillStyle = 'rgba(4,8,13,.82)';
-        ctx.beginPath();
-        ctx.ellipse(-length * .02, 0, length * .105, carWidth * .25, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = 'rgba(245,247,250,.92)';
-        ctx.fillRect(length * .18, -carWidth * .09, length * .18, carWidth * .18);
-
-        ctx.fillStyle = 'rgba(2,5,9,.94)';
-        const wheelLength = length * .18;
-        const wheelWidth = carWidth * .2;
-        [[-.27, -.52], [-.27, .52], [.19, -.52], [.19, .52]].forEach(([x, y]) => {
-          ctx.fillRect(length * x - wheelLength / 2, carWidth * y - wheelWidth / 2, wheelLength, wheelWidth);
+      function updateConfetti(deltaTime) {
+        if (!confettiSystem?.active) return;
+        const dt = clamp(deltaTime, 0, 0.05);
+        confettiSystem.elapsed += dt;
+        const drag = Math.exp(-1.2 * dt);
+        confettiSystem.velocities.forEach((velocity, index) => {
+          velocity.x *= drag;
+          velocity.z *= drag;
+          velocity.y -= 5.8 * dt;
+          confettiSystem.positions[index * 3] += velocity.x * dt;
+          confettiSystem.positions[index * 3 + 1] = Math.max(0.12, confettiSystem.positions[index * 3 + 1] + velocity.y * dt);
+          confettiSystem.positions[index * 3 + 2] += velocity.z * dt;
+          if (confettiSystem.positions[index * 3 + 1] <= 0.12) velocity.multiplyScalar(0.82);
         });
-        ctx.restore();
+        confettiSystem.points.material.opacity = clamp((confettiSystem.duration - confettiSystem.elapsed) / 0.55, 0, 0.96);
+        confettiSystem.points.geometry.attributes.position.needsUpdate = true;
+        if (confettiSystem.elapsed >= confettiSystem.duration) resetConfetti();
+      }
+
+      function createTaperedPrismGeometry(length, height, rearWidth, frontWidth) {
+        const rearX = -length / 2;
+        const frontX = length / 2;
+        const rearHalfWidth = rearWidth / 2;
+        const frontHalfWidth = frontWidth / 2;
+        const positions = [
+          rearX, 0, -rearHalfWidth,
+          rearX, 0, rearHalfWidth,
+          frontX, 0, -frontHalfWidth,
+          frontX, 0, frontHalfWidth,
+          rearX, height, -rearHalfWidth,
+          rearX, height, rearHalfWidth,
+          frontX, height, -frontHalfWidth,
+          frontX, height, frontHalfWidth
+        ];
+        const indices = [
+          0, 2, 1, 1, 2, 3,
+          4, 5, 6, 5, 7, 6,
+          0, 4, 2, 2, 4, 6,
+          1, 3, 5, 3, 7, 5,
+          0, 1, 4, 1, 5, 4,
+          2, 6, 3, 3, 6, 7
+        ];
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return geometry;
+      }
+
+      function createLowPolyCar(runner) {
+        const group = new THREE.Group();
+        group.rotation.order = 'YXZ';
+        const bodyMaterial = new THREE.MeshStandardMaterial({
+          color: runner.color,
+          roughness: 0.27,
+          metalness: 0.42,
+          flatShading: true
+        });
+        const darkMaterial = new THREE.MeshStandardMaterial({
+          color: 0x111820,
+          roughness: 0.86,
+          metalness: 0.05,
+          flatShading: true
+        });
+        const tireMaterial = new THREE.MeshStandardMaterial({
+          color: 0x05070a,
+          roughness: 0.96,
+          metalness: 0,
+          flatShading: true
+        });
+        const hubMaterial = new THREE.MeshStandardMaterial({
+          color: 0x343d47,
+          roughness: 0.74,
+          metalness: 0.18,
+          flatShading: true
+        });
+
+        // Frente lógica em +X: corpo longo e baixo, com o bico avançando até a asa.
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.06, 0.7), darkMaterial);
+        floor.position.set(-0.14, 0.19, 0);
+        group.add(floor);
+
+        const chassis = new THREE.Mesh(
+          createTaperedPrismGeometry(1.55, 0.28, 0.52, 0.24),
+          bodyMaterial
+        );
+        chassis.position.set(-0.13, 0.22, 0);
+        group.add(chassis);
+
+        const nose = new THREE.Mesh(
+          createTaperedPrismGeometry(1.05, 0.13, 0.24, 0.055),
+          bodyMaterial
+        );
+        nose.position.set(0.88, 0.23, 0);
+        group.add(nose);
+
+        const engineCover = new THREE.Mesh(
+          createTaperedPrismGeometry(0.72, 0.3, 0.14, 0.3),
+          bodyMaterial
+        );
+        engineCover.position.set(-0.43, 0.48, 0);
+        group.add(engineCover);
+
+        // Sidepods separados: estreitos na frente e mais cheios junto ao eixo traseiro.
+        [-1, 1].forEach((side) => {
+          const sidepod = new THREE.Mesh(
+            createTaperedPrismGeometry(0.82, 0.19, 0.28, 0.15),
+            bodyMaterial
+          );
+          sidepod.position.set(-0.18, 0.3, side * 0.3);
+          group.add(sidepod);
+        });
+
+        const cockpitSurround = new THREE.Mesh(
+          createTaperedPrismGeometry(0.44, 0.17, 0.32, 0.22),
+          bodyMaterial
+        );
+        cockpitSurround.position.set(0.0, 0.46, 0);
+        group.add(cockpitSurround);
+
+        const cockpitOpening = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.08, 0.18), darkMaterial);
+        cockpitOpening.position.set(-0.01, 0.62, 0);
+        group.add(cockpitOpening);
+
+        // Halo low-poly em forma de U, com duas hastes e pilar central dianteiro.
+        [-1, 1].forEach((side) => {
+          const haloRail = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.035, 0.035), darkMaterial);
+          haloRail.position.set(-0.01, 0.72, side * 0.15);
+          group.add(haloRail);
+        });
+        const haloFront = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.3), darkMaterial);
+        haloFront.position.set(0.16, 0.72, 0);
+        group.add(haloFront);
+
+        const haloPillar = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.18, 0.035), darkMaterial);
+        haloPillar.position.set(0.16, 0.63, 0);
+        group.add(haloPillar);
+
+        const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.055, 1.02), darkMaterial);
+        frontWing.position.set(1.45, 0.15, 0);
+        group.add(frontWing);
+
+        [-1, 1].forEach((side) => {
+          const frontWingEndplate = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.04), darkMaterial);
+          frontWingEndplate.position.set(1.43, 0.2, side * 0.51);
+          group.add(frontWingEndplate);
+        });
+
+        const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.11, 1.02), darkMaterial);
+        rearWing.position.set(-1.0, 0.7, 0);
+        group.add(rearWing);
+
+        const rearWingBeam = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.065, 0.82), darkMaterial);
+        rearWingBeam.position.set(-0.94, 0.53, 0);
+        group.add(rearWingBeam);
+
+        [-1, 1].forEach((side) => {
+          const rearWingStrut = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.36, 0.065), darkMaterial);
+          rearWingStrut.position.set(-0.95, 0.51, side * 0.33);
+          group.add(rearWingStrut);
+        });
+
+        const wheelGeometry = new THREE.CylinderGeometry(0.22, 0.22, 0.2, 10);
+        const hubGeometry = new THREE.CylinderGeometry(0.09, 0.09, 0.205, 8);
+        [
+          [-0.7, -0.49], [-0.7, 0.49],
+          [0.78, -0.49], [0.78, 0.49]
+        ].forEach(([x, z]) => {
+          const wheel = new THREE.Mesh(wheelGeometry, tireMaterial);
+          wheel.rotation.x = Math.PI / 2;
+          wheel.position.set(x, 0.23, z);
+          group.add(wheel);
+
+          const hub = new THREE.Mesh(hubGeometry, hubMaterial);
+          hub.rotation.x = Math.PI / 2;
+          hub.position.set(x, 0.23, z);
+          group.add(hub);
+        });
+
+        const glow = new THREE.Mesh(
+          new THREE.CircleGeometry(0.62, 20),
+          new THREE.MeshBasicMaterial({ color: runner.color, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending })
+        );
+        glow.rotation.x = -Math.PI / 2;
+        glow.position.y = 0.055;
+        glow.scale.set(2.25, 0.88, 1);
+        group.add(glow);
+        group.traverse((child) => {
+          if (!child.isMesh || child === glow) return;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        });
+        return group;
+      }
+
+      function createTrailObject(runner) {
+        const maxPoints = 34;
+        const positions = new Float32Array(maxPoints * 3);
+        const geometry = new THREE.BufferGeometry();
+        const attribute = new THREE.BufferAttribute(positions, 3);
+        attribute.setUsage(THREE.DynamicDrawUsage);
+        geometry.setAttribute('position', attribute);
+        geometry.setDrawRange(0, 0);
+        const material = new THREE.LineBasicMaterial({
+          color: runner.color,
+          transparent: true,
+          opacity: 0.48,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const line = new THREE.Line(geometry, material);
+        scene.add(line);
+        return { line, positions, history: [], maxPoints, lastDistance: Infinity };
+      }
+
+      // Graphics-only pass: never consumes the race RNG or changes simulation state.
+      function detailBox(group, material, size, position, tilt = 0) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+        mesh.position.set(...position);
+        mesh.rotation.x = tilt;
+        group.add(mesh);
+        return mesh;
+      }
+
+      function detailStand(group, side, steel) {
+        const roof = new THREE.MeshStandardMaterial({color: 0xd5d9d4, roughness: 0.48, metalness: 0.45});
+        detailBox(group, roof, [5.35, 0.09, 2.6], [0, 2.55, side * 0.94], side * 0.07);
+        for (const x of [-2.45, 0, 2.45]) {
+          detailBox(group, steel, [0.09, 2.55, 0.09], [x, 1.28, side * 2.08]);
+          detailBox(group, steel, [0.07, 0.14, 2.55], [x, 2.43, side * 0.94], side * 0.07);
+        }
+        for (const x of [-2.5, 2.5]) {
+          detailBox(group, steel, [0.045, 0.045, 2.25], [x, 1.04, side * 0.94], -side * 0.47);
+          for (let i=0;i<5;i++) detailBox(group, steel, [0.04, 0.46, 0.04], [x, 0.54+i*0.24, side*i*0.47]);
+        }
+      }
+
+      function detailPit(group, side, trim, glass) {
+        glass.roughness = 0.22;
+        glass.metalness = 0.35;
+        const dark = new THREE.MeshStandardMaterial({color: 0x343e45, roughness: 0.74});
+        detailBox(group, trim, [7.4, 0.09, 0.35], [0, 1.52, -side*1.34]);
+        for(let i=0;i<6;i++) {
+          const x=-3.06+i*1.23;
+          detailBox(group, trim, [0.075, 1.45, 0.12], [x, 0.73, -side*1.43]);
+        }
+        for(let i=0;i<5;i++) {
+          const x=-2.45+i*1.23;
+          for(let j=0;j<5;j++) detailBox(group, dark, [1.02,0.018,0.02], [x,0.2+j*0.14,-side*1.432]);
+        }
+        // Rear glazing and mullions, visible from the opposite camera angle.
+        detailBox(group, glass, [5.45,0.62,0.08], [0.2,2.15,side*1.25]);
+        for(let i=0;i<8;i++) detailBox(group,trim,[0.045,0.65,0.1],[-2.5+i*0.77,2.15,side*1.28]);
+        for(const x of [-1.5,1.5]) detailBox(group,trim,[0.85,0.22,0.6],[x,2.99,0.25]);
+      }
+
+      function surfaceTexture() {
+        const canvas=document.createElement('canvas'); canvas.width=canvas.height=128;
+        const ctx=canvas.getContext('2d'), pixels=ctx.createImageData(128,128);
+        let seed=1979;
+        for(let i=0;i<pixels.data.length;i+=4) {
+          seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+          const v=210+(seed>>>27);
+          pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=v; pixels.data[i+3]=255;
+        }
+        ctx.putImageData(pixels,0,0);
+        const texture=new THREE.CanvasTexture(canvas);
+        texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+        texture.colorSpace=THREE.SRGBColorSpace;
+        texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+        return texture;
+      }
+
+      function upgradeGraphics() {
+        if(new URLSearchParams(location.search).has('profile')) installGraphicsProfiler();
+        const skyCanvas=document.createElement('canvas'); skyCanvas.width=256; skyCanvas.height=128;
+        const ctx=skyCanvas.getContext('2d'), gradient=ctx.createLinearGradient(0,0,0,128);
+        gradient.addColorStop(0,'#718da9'); gradient.addColorStop(0.47,'#dae8ee');
+        gradient.addColorStop(0.52,'#b9b49f'); gradient.addColorStop(1,'#494d42');
+        ctx.fillStyle=gradient; ctx.fillRect(0,0,256,128);
+        const skyTexture=new THREE.CanvasTexture(skyCanvas);
+        skyTexture.mapping=THREE.EquirectangularReflectionMapping; skyTexture.colorSpace=THREE.SRGBColorSpace;
+        const pmrem=new THREE.PMREMGenerator(renderer);
+        const environment=pmrem.fromEquirectangular(skyTexture);
+        scene.environment=environment.texture;
+        scene.userData.environmentTarget=environment;
+        pmrem.dispose(); skyTexture.dispose();
+        scene.background.set(0xb5cedb); scene.fog.color.set(0xb5cedb);
+        const noise=surfaceTexture(), dynamic=new Set();
+        carObjects.forEach(({group})=>group.traverse(o=>dynamic.add(o)));
+        scene.traverse(o=>{
+          if(!o.isMesh) return;
+          if(dynamic.has(o)) { o.receiveShadow=false; return; }
+          o.castShadow=false;
+          o.receiveShadow=!!o.userData.surface;
+          if(o.isInstancedMesh) o.receiveShadow=false;
+          if(o.material.isMeshBasicMaterial && !o.material.transparent) {
+            const old=o.material;
+            o.material=new THREE.MeshStandardMaterial({color:old.color,roughness:0.8,
+              emissive:old.color,emissiveIntensity:0.12});
+          }
+          if(o.userData.surface) {
+            const p=o.geometry.attributes.position, uv=new Float32Array(p.count*2);
+            const world=new THREE.Vector3(); o.updateWorldMatrix(true,false);
+            for(let i=0;i<p.count;i++) {world.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld); uv[i*2]=world.x*1.8; uv[i*2+1]=world.z*1.8;}
+            o.geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+            o.material.map=noise; o.material.roughnessMap=noise;
+            o.material.roughness=o.userData.surface==='asphalt'?0.92:1;
+            o.material.color.set(o.userData.surface==='asphalt'?0x343a3e:0x68854b);
+          }
+        });
+        batchStaticScene(dynamic);
+      }
+
+      function installGraphicsProfiler() {
+        const panel=document.createElement('pre');
+        panel.style.cssText='position:fixed;bottom:12px;left:12px;z-index:9999;background:#101820e8;color:#d9f7e6;padding:10px;border-radius:8px;pointer-events:none;font:12px monospace';
+        document.body.appendChild(panel);
+        const render=renderer.render.bind(renderer);
+        let previous=0, frames=[], cpu=[], lastReport=0;
+        renderer.render=function(...args) {
+          const start=performance.now();
+          render(...args);
+          const end=performance.now();
+          if(previous && start-previous<1000) frames.push(start-previous);
+          previous=start;cpu.push(end-start);
+          if(end-lastReport>1000 && frames.length) {
+            const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+            const ms=mean(frames);
+            window.neonGraphicsStats={fps:1000/ms,frameMs:ms,cpuSubmitMs:mean(cpu),calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
+            panel.textContent=`${window.neonGraphicsStats.fps.toFixed(1)} FPS | ${ms.toFixed(2)} ms/frame\nCPU submit ${mean(cpu).toFixed(2)} ms | ${renderer.info.render.calls} calls\n${renderer.info.render.triangles} triangles (incl. shadows)`;
+            frames=[];cpu=[];lastReport=end;
+          }
+        };
+      }
+
+      function batchStaticScene(dynamic) {
+        // Bake into 12-unit spatial cells, retaining frustum culling and material boundaries.
+        scene.updateMatrixWorld(true);
+        const buckets=new Map(), removed=[], geometries=new Set();
+        scene.traverse(o=>{
+          if(!o.isMesh || o.isInstancedMesh || dynamic.has(o) || Array.isArray(o.material) || o.material.transparent) return;
+          const m=o.material;
+          if(!m.isMeshStandardMaterial) return;
+          const pos=new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
+          const key=[Math.floor(pos.x/12),Math.floor(pos.z/12),m.roughness,m.metalness,m.flatShading,m.side,m.emissive.getHex(),m.emissiveIntensity,m.map?.uuid||'',o.receiveShadow].join(':');
+          if(!buckets.has(key)) buckets.set(key,{material:m,receive:o.receiveShadow,parts:[]});
+          const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();
+          g.applyMatrix4(o.matrixWorld);
+          const p=g.attributes.position, colors=new Float32Array(p.count*3);
+          for(let i=0;i<p.count;i++) {colors[i*3]=m.color.r;colors[i*3+1]=m.color.g;colors[i*3+2]=m.color.b;}
+          g.setAttribute('color',new THREE.BufferAttribute(colors,3));
+          buckets.get(key).parts.push(g); removed.push(o); geometries.add(o.geometry);
+        });
+        for(const bucket of buckets.values()) {
+          const merged=new THREE.BufferGeometry();
+          for(const [name,size] of [['position',3],['normal',3],['color',3],['uv',2]]) {
+            const count=bucket.parts.reduce((n,g)=>n+g.attributes.position.count,0);
+            const values=new Float32Array(count*size); let offset=0;
+            for(const g of bucket.parts) {if(g.attributes[name]) values.set(g.attributes[name].array,offset); offset+=g.attributes.position.count*size;}
+            merged.setAttribute(name,new THREE.BufferAttribute(values,size));
+          }
+          const material=bucket.material.clone(); material.color.set(0xffffff); material.vertexColors=true;
+          const mesh=new THREE.Mesh(merged,material); mesh.receiveShadow=bucket.receive;
+          merged.computeBoundingSphere(); scene.add(mesh);
+          bucket.parts.forEach(g=>g.dispose());
+        }
+        removed.forEach(o=>o.removeFromParent());
+        const used=new Set(); scene.traverse(o=>{if(o.geometry) used.add(o.geometry);});
+        geometries.forEach(g=>{if(!used.has(g))g.dispose();});
+      }
+
+      function initThreeScene() {
+        if (!window.THREE) {
+          elements.raceStateLabel.textContent = 'Three.js indisponível';
+          return;
+        }
+        renderer = new THREE.WebGLRenderer({
+          canvas: elements.canvas,
+          antialias: true,
+          alpha: false,
+          powerPreference: 'high-performance'
+        });
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.05;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setClearColor(0x8fcfe3, 1);
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x8fcfe3);
+        scene.fog = new THREE.Fog(0x8fcfe3, 55, 86);
+        camera = new THREE.PerspectiveCamera(50, 1, 0.1, 140);
+        state.cameraPosition = new THREE.Vector3(0, 6, 10);
+        state.cameraLookAt = new THREE.Vector3(0, 0.4, 0);
+        state.cameraDesiredPosition = new THREE.Vector3();
+        state.cameraDesiredLookAt = new THREE.Vector3();
+        camera.position.copy(state.cameraPosition);
+        camera.lookAt(state.cameraLookAt);
+
+        scene.add(new THREE.AmbientLight(0xfff4dc, 0.18));
+        scene.add(new THREE.HemisphereLight(0xc8e2ff, 0x605744, 0.85));
+        const keyLight = new THREE.DirectionalLight(0xffe4bf, 3.0);
+        keyLight.position.set(-12, 26, 12);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.set(1024, 1024);
+        keyLight.shadow.camera.left = -36;
+        keyLight.shadow.camera.right = 36;
+        keyLight.shadow.camera.top = 28;
+        keyLight.shadow.camera.bottom = -28;
+        keyLight.shadow.camera.near = 1;
+        keyLight.shadow.camera.far = 70;
+        keyLight.shadow.bias = -0.00035;
+        keyLight.shadow.normalBias = 0.025;
+        scene.add(keyLight);
+        const rimLight = new THREE.PointLight(0xffd86b, 12, 36, 2);
+        rimLight.position.set(13, 10, -8);
+        scene.add(rimLight);
+
+        createTrackScene();
+        state.race.runners.forEach((runner) => {
+          const group = createLowPolyCar(runner);
+          scene.add(group);
+          carObjects.set(runner.id, { group, trail: createTrailObject(runner) });
+        });
+        confettiSystem = createConfettiSystem();
+        // Cenário decorativo é criado por último: mesmo que um prop seja
+        // descartado, carros, câmera e loop principal já estão disponíveis.
+        createEnvironmentProps();
+        upgradeGraphics();
+      }
+
+      function updateTrail(runner, pose) {
+        const object = carObjects.get(runner.id);
+        if (!object) return;
+        const trail = object.trail;
+        if (runner.distance + 5 < trail.lastDistance) trail.history = [];
+        if (!trail.history.length || Math.abs(runner.distance - trail.lastDistance) >= 1.4) {
+          trail.history.push(new THREE.Vector3(pose.x, 0.16, pose.z));
+          if (trail.history.length > trail.maxPoints) trail.history.shift();
+          trail.lastDistance = runner.distance;
+        }
+        trail.history.forEach((point, index) => {
+          trail.positions[index * 3] = point.x;
+          trail.positions[index * 3 + 1] = point.y;
+          trail.positions[index * 3 + 2] = point.z;
+        });
+        trail.line.geometry.setDrawRange(0, trail.history.length);
+        trail.line.geometry.attributes.position.needsUpdate = true;
+        trail.line.material.opacity = runner.sprintTimer > 0 ? 0.9 : 0.48;
       }
 
       function getRunnerLap(runner) {
@@ -2456,72 +4400,188 @@
         return clamp(Math.floor(runner.distance / LOGICAL_LAP_LENGTH) + 1, 1, TOTAL_LAPS);
       }
 
-      function drawRaceTelemetry(ranks) {
-        const { width, height } = state.view;
-        const compact = width < 620;
-        const gap = compact ? 4 : 8;
-        const margin = compact ? 7 : 14;
-        const cardWidth = (width - margin * 2 - gap * 3) / 4;
-        const cardHeight = compact ? 34 : 42;
-
-        state.race.runners.forEach((runner, index) => {
-          const x = margin + index * (cardWidth + gap);
-          const y = compact ? 7 : 12;
+      function update3dTelemetry() {
+        if (!state.race || !elements.race3dHud) return;
+        const ranks = getRanks();
+        state.race.runners.forEach((runner) => {
+          const card = elements.race3dHud.querySelector(`[data-runner-id="${runner.id}"]`);
+          if (!card) return;
           const rank = ranks.get(runner.id);
-          const status = getRunnerStatus(runner, rank);
-          ctx.save();
-          ctx.fillStyle = 'rgba(5, 9, 14, .82)';
-          ctx.strokeStyle = `rgba(${runner.rgb}, .34)`;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.roundRect(x, y, cardWidth, cardHeight, 7);
-          ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = runner.color;
-          ctx.fillRect(x, y, 3, cardHeight);
-          ctx.fillStyle = 'rgba(244,247,250,.92)';
-          ctx.font = `800 ${compact ? 8 : 10}px ui-monospace, monospace`;
-          ctx.fillText(`${runner.short}  ${state.phase === 'betting' ? 'P–' : `P${rank}`}`, x + 9, y + (compact ? 13 : 16));
-          ctx.fillStyle = 'rgba(181,191,204,.76)';
-          ctx.font = `700 ${compact ? 6.5 : 8}px ui-monospace, monospace`;
-          ctx.fillText(compact ? status.slice(0, 10) : `${status} · V${getRunnerLap(runner)}/${TOTAL_LAPS}`, x + 9, y + (compact ? 26 : 31));
-          ctx.restore();
+          const isCameraTarget = runner.id === state.cameraTargetRunnerId;
+          card.classList.toggle('is-camera-target', isCameraTarget);
+          card.setAttribute('aria-pressed', String(isCameraTarget));
+          card.querySelector('[data-role="rank"]').textContent = state.phase === 'betting' ? 'P–' : `P${rank}`;
+          card.querySelector('[data-role="status"]').textContent = getRunnerStatus(runner, rank);
+          card.querySelector('[data-role="lap"]').textContent = `V${getRunnerLap(runner)}/${TOTAL_LAPS}`;
         });
-
         const leader = [...state.race.runners].sort((a, b) => b.progress - a.progress || b.velocity - a.velocity)[0];
-        ctx.save();
-        ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(255,255,255,.2)';
-        ctx.font = `800 ${compact ? 8 : 10}px ui-monospace, monospace`;
-        const lapDisplayY = height * .7;
-        ctx.fillText('CONTROLE DE VOLTA', width / 2, lapDisplayY - 11);
-        ctx.fillStyle = 'rgba(245,247,250,.9)';
-        ctx.font = `900 ${compact ? 16 : 22}px ui-monospace, monospace`;
-        ctx.fillText(`${getRunnerLap(leader)} / ${TOTAL_LAPS}`, width / 2, lapDisplayY + 12);
-        ctx.restore();
+        elements.lap3d.textContent = `${getRunnerLap(leader)} / ${TOTAL_LAPS}`;
       }
 
-      function drawRace() {
-        if (!state.view.width || !state.race) return;
-        drawTrack();
+      const CAR_RACING_LINES = [-1.5, -0.5, 0.5, 1.5];
+
+      function selectCameraTarget(runnerId) {
+        if (!RUNNERS.some((runner) => runner.id === runnerId)) return;
+        state.cameraTargetRunnerId = runnerId;
+        update3dTelemetry();
+        announce(`Câmera acompanhando o corredor ${runnerId}.`);
+      }
+
+      function updateFollowCamera(deltaTime) {
+        if (!camera || !state.race || !state.cameraPosition || !state.cameraLookAt) return;
+        const runner = state.race.runners.find((item) => item.id === state.cameraTargetRunnerId) || state.race.runners[0];
+        const object = carObjects.get(runner.id);
+        if (!object) return;
+        const pose = object.pose || getPositionAtDistance(runner.distance);
+        const forwardX = Math.cos(pose.angle);
+        const forwardZ = Math.sin(pose.angle);
+        const celebrationElapsed = state.celebration
+          ? Math.max(0, (performance.now() - state.celebration.startedAt) / 1000)
+          : 0;
+        const celebrationProgress = state.celebration
+          ? clamp(celebrationElapsed / Math.max(0.01, state.celebration.duration * 0.62), 0, 1)
+          : 0;
+        const focusEase = celebrationProgress * celebrationProgress * (3 - 2 * celebrationProgress);
+        const normalChaseDistance = 7.8 + clamp(runner.velocity / 220, 0, 0.65);
+        const normalCameraHeight = 5.4 + clamp(runner.velocity / 260, 0, 0.4);
+        const chaseDistance = lerp(normalChaseDistance, 4.35, focusEase);
+        const cameraHeight = lerp(normalCameraHeight, 3.25, focusEase);
+        const lookAhead = lerp(2.4, 0.7, focusEase);
+
+        state.cameraDesiredPosition.set(
+          object.group.position.x - forwardX * chaseDistance,
+          cameraHeight,
+          object.group.position.z - forwardZ * chaseDistance
+        );
+        state.cameraDesiredLookAt.set(
+          object.group.position.x + forwardX * lookAhead,
+          lerp(0.42, 0.55, focusEase),
+          object.group.position.z + forwardZ * lookAhead
+        );
+
+        // Amortecimento exponencial independente de FPS: inclusive ao trocar
+        // de corredor, a câmera viaja até o novo alvo sem corte instantâneo.
+        const smoothing = 1 - Math.exp(-4.6 * clamp(deltaTime || 1 / 60, 0, 0.08));
+        state.cameraPosition.lerp(state.cameraDesiredPosition, smoothing);
+        state.cameraLookAt.lerp(state.cameraDesiredLookAt, smoothing);
+        camera.position.copy(state.cameraPosition);
+        camera.lookAt(state.cameraLookAt);
+      }
+
+      function drawMinimap() {
+        if (!elements.raceMinimap || !state.race || !state.view.bounds) return;
+        const rect = elements.raceMinimap.getBoundingClientRect();
+        if (rect.width < 20 || rect.height < 20) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const pixelWidth = Math.round(rect.width * dpr);
+        const pixelHeight = Math.round(rect.height * dpr);
+        if (elements.raceMinimap.width !== pixelWidth || elements.raceMinimap.height !== pixelHeight) {
+          elements.raceMinimap.width = pixelWidth;
+          elements.raceMinimap.height = pixelHeight;
+        }
+
+        const context = elements.raceMinimap.getContext('2d');
+        const width = rect.width;
+        const height = rect.height;
+        const paddingX = 15;
+        const paddingTop = 25;
+        const paddingBottom = 12;
+        const bounds = state.view.bounds;
+        const rangeX = Math.max(1, bounds.maxX - bounds.minX);
+        const rangeZ = Math.max(1, bounds.maxZ - bounds.minZ);
+        const scale = Math.min(
+          (width - paddingX * 2) / rangeX,
+          (height - paddingTop - paddingBottom) / rangeZ
+        );
+        const centerX = (bounds.minX + bounds.maxX) / 2;
+        const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+        const mapX = (x) => width / 2 + (x - centerX) * scale;
+        const mapY = (z) => paddingTop + (height - paddingTop - paddingBottom) / 2 + (z - centerZ) * scale;
+
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = 'rgba(5, 10, 16, .94)';
+        context.fillRect(0, 0, width, height);
+        context.fillStyle = '#8d99a8';
+        context.font = '700 8px ui-monospace, SFMono-Regular, Menlo, monospace';
+        context.letterSpacing = '0.08em';
+        context.fillText(`VISÃO GERAL · C${state.cameraTargetRunnerId}`, 12, 15);
+
+        context.beginPath();
+        state.view.pathSamples.forEach((sample, index) => {
+          const x = mapX(sample.x);
+          const y = mapY(sample.z);
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        });
+        context.closePath();
+        context.lineJoin = 'round';
+        context.lineCap = 'round';
+        context.strokeStyle = '#edf1f5';
+        context.lineWidth = Math.max(5, state.view.trackWidth * scale * 0.82);
+        context.stroke();
+        context.strokeStyle = '#3b4652';
+        context.lineWidth = Math.max(3, state.view.trackWidth * scale * 0.52);
+        context.stroke();
+
+        state.race.runners.forEach((runner) => {
+          const lateralOffset = CAR_RACING_LINES[runner.id - 1] * 0.7;
+          const pose = getPositionAtDistance(runner.distance, lateralOffset);
+          const selected = runner.id === state.cameraTargetRunnerId;
+          context.beginPath();
+          context.arc(mapX(pose.x), mapY(pose.z), selected ? 5.2 : 3.8, 0, Math.PI * 2);
+          context.fillStyle = runner.color;
+          context.fill();
+          context.lineWidth = selected ? 2 : 1;
+          context.strokeStyle = selected ? '#ffffff' : 'rgba(255, 255, 255, .45)';
+          context.stroke();
+        });
+      }
+
+      function drawRace(deltaTime = 1 / 60) {
+        if (!renderer || !scene || !camera || !state.race) return;
         const ranks = getRanks();
-        const runnersByDepth = [...state.race.runners].sort((a, b) => ranks.get(b.id) - ranks.get(a.id));
-        runnersByDepth.forEach((runner) => {
-          const distance = runner.distance;
-          const centerPose = getPositionAtDistance(distance);
-          const baseLine = (runner.id - 2.5) * state.view.laneSpacing * .72;
-          const lineBias = [-1, .65, -.55, 1][runner.id - 1] * state.view.laneSpacing * .32;
+        state.race.runners.forEach((runner) => {
+          const object = carObjects.get(runner.id);
+          if (!object) return;
+          const centerPose = getPositionAtDistance(runner.distance);
+          const baseLine = CAR_RACING_LINES[runner.id - 1];
+          const lineBias = [-1, 0.65, -0.55, 1][runner.id - 1] * 0.1;
           const dynamicLine = lineBias * centerPose.cornerSeverity * (centerPose.turnSign || 1);
           const laneOffset = clamp(
             baseLine + dynamicLine + runner.driftOffset,
-            -state.view.trackWidth / 2 + 8,
-            state.view.trackWidth / 2 - 8
+            -state.view.trackWidth / 2 + 0.55,
+            state.view.trackWidth / 2 - 0.55
           );
-          const pose = getPositionAtDistance(distance, laneOffset);
-          drawTrail(runner, distance, laneOffset);
-          drawCar(runner, pose);
+          const pose = getPositionAtDistance(runner.distance, laneOffset);
+          object.group.position.set(pose.x, 0.08, pose.z);
+          object.group.rotation.y = -pose.angle;
+          object.group.rotation.x = -pose.turnSign * pose.cornerSeverity * 0.1;
+          object.pose = pose;
+          const pulse = runner.sprintTimer > 0 ? 1.08 : 1;
+          object.group.scale.setScalar(pulse);
+
+          // A comemoração é puramente visual: a distância oficial permanece
+          // congelada na linha, preservando classificação e liquidação.
+          if (state.celebration?.winnerId === runner.id) {
+            const elapsed = Math.max(0, (performance.now() - state.celebration.startedAt) / 1000);
+            const progress = clamp(elapsed / Math.max(0.01, state.celebration.duration), 0, 1);
+            const damping = Math.pow(1 - progress, 1.35);
+            const wiggle = Math.sin(elapsed * 15.5) * damping;
+            object.group.position.x += pose.normalX * wiggle * 0.34;
+            object.group.position.z += pose.normalZ * wiggle * 0.34;
+            object.group.rotation.y += wiggle * 0.22;
+            object.group.rotation.z = Math.sin(elapsed * 12) * damping * 0.055;
+          } else {
+            object.group.rotation.z = 0;
+          }
+          updateTrail(runner, pose);
+          object.group.renderOrder = ranks.get(runner.id);
         });
-        drawRaceTelemetry(ranks);
+        updateConfetti(deltaTime);
+        updateFollowCamera(deltaTime);
+        renderer.render(scene, camera);
+        drawMinimap();
       }
 
       function handleCountdown(now) {
@@ -2539,6 +4599,10 @@
       }
 
       function animationLoop(now) {
+        const previousCameraFrame = state.lastCameraFrame ?? now;
+        const visualDelta = Math.min(0.08, Math.max(0, (now - previousCameraFrame) / 1000));
+        state.lastCameraFrame = now;
+
         if (state.phase === 'countdown') {
           handleCountdown(now);
         } else if (state.phase === 'racing') {
@@ -2550,12 +4614,13 @@
           state.lastFrame = now;
         }
 
-        drawRace();
+        drawRace(visualDelta);
 
         if (now - state.lastUiUpdate > 80) {
           if (state.phase === 'racing' || state.phase === 'finished') {
             elements.raceClock.textContent = formatTime(state.race.elapsedReal);
           }
+          update3dTelemetry();
           state.lastUiUpdate = now;
         }
 
@@ -2574,12 +4639,26 @@
         elements.clearSessionButton.addEventListener('click', clearSession);
         elements.reviewResultButton.addEventListener('click', () => closeResultOverlay(true));
         elements.newRaceButton.addEventListener('click', prepareNewRound);
+        elements.race3dHud.querySelectorAll('[data-runner-id]').forEach((card) => {
+          const runnerId = Number(card.dataset.runnerId);
+          card.addEventListener('click', () => selectCameraTarget(runnerId));
+          card.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            selectCameraTarget(runnerId);
+          });
+        });
         elements.resultOverlay.addEventListener('click', (event) => {
           if (event.target === elements.resultOverlay) {
             closeResultOverlay(true);
           }
         });
         document.addEventListener('keydown', (event) => {
+          const activeElement = document.activeElement;
+          const isEditing = activeElement instanceof HTMLElement && activeElement.matches('input, select, textarea');
+          if (!isEditing && /^[1-4]$/.test(event.key)) {
+            selectCameraTarget(Number(event.key));
+          }
           if (event.key === 'Escape' && !elements.resultOverlay.hidden) {
             closeResultOverlay(true);
           }
@@ -2599,8 +4678,10 @@
         document.addEventListener('visibilitychange', () => {
           if (document.hidden) {
             state.lastFrame = null;
+            state.lastCameraFrame = null;
           } else if (state.phase === 'racing') {
             state.lastFrame = performance.now();
+            state.lastCameraFrame = performance.now();
           }
         });
       }
